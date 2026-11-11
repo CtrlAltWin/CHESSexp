@@ -98,3 +98,4 @@ export const explorerSlice = createSlice({
 export const { setExplorerMode, clearStats } = explorerSlice.actions;
 
 export default explorerSlice.reducer;
+

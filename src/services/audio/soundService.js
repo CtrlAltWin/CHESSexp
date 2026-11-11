@@ -1,115 +1,94 @@
 /**
- * Web Audio API Sound Service for CHESSexp.
- * Generates tactile, professional chess sounds dynamically.
+ * Exact Chess.com Sound Service for CHESSexp.
+ * Preloads and plays official Chess.com audio assets for tactile, authentic feedback.
  */
 class SoundService {
   constructor() {
-    this.ctx = null;
     this.muted = false;
+    this.audioCache = {};
+    this.isBrowser = typeof window !== 'undefined';
+
+    if (this.isBrowser) {
+      this.preloadSounds();
+    }
   }
 
-  init() {
-    if (!this.ctx && typeof window !== 'undefined') {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (AudioContext) {
-        this.ctx = new AudioContext();
+  preloadSounds() {
+    const soundFiles = {
+      move: '/sounds/move-self.mp3',
+      moveOpponent: '/sounds/move-opponent.mp3',
+      capture: '/sounds/capture.mp3',
+      check: '/sounds/move-check.mp3',
+      castle: '/sounds/castle.mp3',
+      promote: '/sounds/promote.mp3',
+      gameEnd: '/sounds/game-end.mp3',
+      gameStart: '/sounds/game-start.mp3',
+      illegal: '/sounds/illegal.mp3'
+    };
+
+    Object.entries(soundFiles).forEach(([name, src]) => {
+      try {
+        const audio = new Audio(src);
+        audio.preload = 'auto';
+        this.audioCache[name] = audio;
+      } catch (e) {
+        // Fallback gracefully
       }
-    }
+    });
   }
 
   setMuted(muted) {
     this.muted = muted;
   }
 
-  playMove() {
-    if (this.muted) return;
-    this.init();
-    if (!this.ctx) return;
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume();
+  play(name) {
+    if (this.muted || !this.isBrowser) return;
+
+    try {
+      const audio = this.audioCache[name];
+      if (audio) {
+        // Clone to allow rapid consecutive clicks / moves without clipping
+        const playInstance = audio.cloneNode();
+        playInstance.volume = 0.85;
+        playInstance.play().catch(() => {
+          // Ignore autoplay restrictions before user interaction
+        });
+      }
+    } catch (e) {
+      console.warn('Audio play failed:', e);
     }
+  }
 
-    const t = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
+  playMove() {
+    this.play('move');
+  }
 
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(320, t);
-    osc.frequency.exponentialRampToValueAtTime(140, t + 0.08);
-
-    gain.gain.setValueAtTime(0.2, t);
-    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.08);
-
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-
-    osc.start(t);
-    osc.stop(t + 0.09);
+  playOpponentMove() {
+    this.play('moveOpponent');
   }
 
   playCapture() {
-    if (this.muted) return;
-    this.init();
-    if (!this.ctx) return;
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume();
-    }
-
-    const t = this.ctx.currentTime;
-    const osc1 = this.ctx.createOscillator();
-    const osc2 = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    osc1.type = 'triangle';
-    osc1.frequency.setValueAtTime(260, t);
-    osc1.frequency.exponentialRampToValueAtTime(90, t + 0.12);
-
-    osc2.type = 'sine';
-    osc2.frequency.setValueAtTime(480, t);
-    osc2.frequency.exponentialRampToValueAtTime(120, t + 0.1);
-
-    gain.gain.setValueAtTime(0.25, t);
-    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
-
-    osc1.connect(gain);
-    osc2.connect(gain);
-    gain.connect(this.ctx.destination);
-
-    osc1.start(t);
-    osc2.start(t);
-    osc1.stop(t + 0.13);
-    osc2.stop(t + 0.13);
+    this.play('capture');
   }
 
   playCheck() {
-    if (this.muted) return;
-    this.init();
-    if (!this.ctx) return;
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume();
-    }
-
-    const t = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(650, t);
-    osc.frequency.exponentialRampToValueAtTime(450, t + 0.18);
-
-    gain.gain.setValueAtTime(0.3, t);
-    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.18);
-
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-
-    osc.start(t);
-    osc.stop(t + 0.19);
+    this.play('check');
   }
 
   playCastle() {
-    this.playMove();
-    setTimeout(() => this.playMove(), 80);
+    this.play('castle');
+  }
+
+  playPromote() {
+    this.play('promote');
+  }
+
+  playGameEnd() {
+    this.play('gameEnd');
+  }
+
+  playIllegal() {
+    this.play('illegal');
   }
 }
 

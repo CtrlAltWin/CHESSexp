@@ -57,3 +57,4 @@ export const opponentSlice = createSlice({
 export const { setSelectedProfile, setActiveDatabase } = opponentSlice.actions;
 
 export default opponentSlice.reducer;
+

@@ -235,3 +235,4 @@ export const SAMPLE_GAMES = [
 1. d4 d5 2. Bf4 Nf6 3. e3 c5 4. Nf3 Nc6 5. Nbd2 cxd4 6. exd4 Bf5 7. Bb5 Qb6 8. c4 e6 9. Qa4 Be7 10. c5 Qd8 11. Ne5 O-O 12. Bxc6 bxc6 13. Nxc6 Qd7 14. Nxe7+ Qxe7 15. Bd6 Qb7 16. Bxf8 Qxb2 17. O-O Rxf8 18. Nf3 Ne4 19. Qxa7 Bg4 20. Rab1 Qc2 21. Rbc1 Qd3 22. Ne5 Qxd4 23. Nxg4 Nd2 24. Ne3 Nxf1 25. Rxf1 Rc8 26. Rc1 Qd2 27. Qa3 d4 28. Nf1 Qg5 29. c6 h5 30. c7 d3 31. Qc3 h4 32. h3 e5 33. Ne3 e4 34. Qc4 Qe5 35. a4 g6 36. Qc6 Kg7 37. Qc3 Qxc3 38. Rxc3 f5 39. Kf1 Kf6 40. Ke1 Ke5 41. Kd2 Kd4 42. a5 f4 43. Ng4 1-0`
   }
 ];
+

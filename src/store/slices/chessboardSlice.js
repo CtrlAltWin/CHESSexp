@@ -78,9 +78,13 @@ export const chessboardSlice = createSlice({
           const newFen = chess.fen();
           const newNormFen = normalizeFen(newFen);
           
-          // Sound effects
-          if (chess.inCheck()) {
+          // Sound effects exactly matching chess.com
+          if (chess.isCheckmate() || chess.isDraw()) {
+            soundService.playGameEnd();
+          } else if (chess.inCheck()) {
             soundService.playCheck();
+          } else if (moveRes.promotion) {
+            soundService.playPromote();
           } else if (moveRes.captured) {
             soundService.playCapture();
           } else if (moveRes.san.includes('O-O')) {
@@ -260,3 +264,4 @@ export const {
 } = chessboardSlice.actions;
 
 export default chessboardSlice.reducer;
+

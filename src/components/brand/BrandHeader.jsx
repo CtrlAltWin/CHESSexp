@@ -66,16 +66,16 @@ export default function BrandHeader({
           </span>
         </div>
 
-        {/* Center: Profile / Database Selector */}
+        {/* Center: Repertoire / Account Selector */}
         <div className="relative">
           <button
             onClick={() => setDropdownOpen(!dropdownOpen)}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-brand-card hover:bg-brand-hover border border-brand-border text-xs sm:text-sm font-medium transition-smooth max-w-[190px] sm:max-w-[260px]"
-            title="Switch Database / Opponent"
+            title="Switch Player Repertoire"
           >
             <Users className="w-3.5 h-3.5 text-brand-accent flex-shrink-0" />
             <div className="flex flex-col text-left truncate">
-              <span className="text-[10px] text-slate-400 leading-tight">Database</span>
+              <span className="text-[10px] text-slate-400 leading-tight">My Repertoire</span>
               <span className="truncate text-slate-200 font-semibold leading-tight">
                 {activeProfObj.displayName || activeProfObj.username}
               </span>
@@ -90,7 +90,7 @@ export default function BrandHeader({
               onMouseLeave={() => setDropdownOpen(false)}
             >
               <div className="px-3 py-1.5 border-b border-brand-border/60 text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex justify-between items-center">
-                <span>Imported Databases</span>
+                <span>Player Accounts</span>
                 <span className="text-brand-accent">{profiles.length} profiles</span>
               </div>
               
@@ -117,7 +117,7 @@ export default function BrandHeader({
                         )}
                         <span className="truncate">{p.displayName || p.username}</span>
                       </div>
-                      <span className="text-[10px] text-slate-400 flex-shrink-0 ml-2">
+                      <span className="text-[10px] text-slate-400 flex-shrink-0 ml-2 font-mono">
                         {p.totalGames || 0} games
                       </span>
                     </button>
@@ -126,7 +126,7 @@ export default function BrandHeader({
 
                 {profiles.length === 0 && (
                   <div className="px-3 py-4 text-center text-xs text-slate-400">
-                    No databases imported yet.
+                    No account imported yet.
                   </div>
                 )}
               </div>
@@ -140,7 +140,7 @@ export default function BrandHeader({
                   className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-brand-accent hover:bg-brand-accentHover text-slate-950 text-xs font-semibold transition-smooth"
                 >
                   <DownloadCloud className="w-3.5 h-3.5" />
-                  <span>Import Chess.com Games</span>
+                  <span>Import My Chess.com Games</span>
                 </button>
               </div>
             </div>
@@ -208,3 +208,4 @@ export default function BrandHeader({
     </header>
   );
 }
+

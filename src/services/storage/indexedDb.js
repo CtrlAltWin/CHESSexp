@@ -37,3 +37,4 @@ export async function getDb() {
   }
   return dbPromise;
 }
+

@@ -18,7 +18,7 @@ export default function SettingsModal({ isOpen, onClose }) {
 
   const boardThemes = [
     { id: 'green', name: 'Chess.com Green', light: '#eeeed2', dark: '#769656' },
-    { id: 'blue', name: 'Ocean Blue', light: '#e1e7ed', dark: '#68889e' },
+    { id: 'blue', name: 'Neo Blue', light: '#e1e7ed', dark: '#68889e' },
     { id: 'wood', name: 'Classic Wood', light: '#f0d9b5', dark: '#b58863' },
     { id: 'slate', name: 'Modern Slate', light: '#e2e8f0', dark: '#475569' }
   ];
@@ -159,3 +159,4 @@ export default function SettingsModal({ isOpen, onClose }) {
     </div>
   );
 }
+

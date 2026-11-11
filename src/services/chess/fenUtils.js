@@ -93,3 +93,4 @@ export function detectOpeningName(moves) {
 
   return `Opening (${moves.slice(0, 4).join(' ')})`;
 }
+

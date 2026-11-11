@@ -98,10 +98,10 @@ export default function OpeningExplorer() {
         {/* Database Info Pill */}
         <div className="flex items-center justify-between text-xs text-slate-400">
           <span className="truncate">
-            Source: <strong className="text-slate-200">{activeProfileObj.displayName || activeProfileObj.username}</strong>
+            Repertoire: <strong className="text-slate-200">{activeProfileObj.displayName || activeProfileObj.username}</strong>
           </span>
           <span className="text-[11px] font-mono text-brand-accent">
-            {gamesCount.toLocaleString()} matching games
+            {gamesCount.toLocaleString()} personal games
           </span>
         </div>
       </div>
@@ -228,3 +228,4 @@ export default function OpeningExplorer() {
     </div>
   );
 }
+

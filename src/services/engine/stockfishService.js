@@ -180,23 +180,41 @@ class StockfishService {
       if (mateMatch) {
         scoreType = 'mate';
         isMate = true;
-        let mateVal = parseInt(mateMatch[1], 10);
-        
-        const activeColor = this.currentFen.split(' ')[1];
-        if (activeColor === 'b') {
-          mateVal = -mateVal;
-        }
+        let rawMate = parseInt(mateMatch[1], 10);
+        const activeColor = this.currentFen.split(' ')[1]; // 'w' or 'b'
 
-        mateIn = mateVal;
-        scoreText = mateVal > 0 ? `+M${mateVal}` : `-M${Math.abs(mateVal)}`;
+        // If mate 0: active side has 0 legal moves and is checkmated
+        if (rawMate === 0) {
+          if (activeColor === 'b') {
+            // Black is checkmated! White has won!
+            mateIn = 0;
+            scoreVal = 100000;
+            scoreText = '+M0';
+            evalPercent = 100;
+          } else {
+            // White is checkmated! Black has won!
+            mateIn = 0;
+            scoreVal = -100000;
+            scoreText = '-M0';
+            evalPercent = 0;
+          }
+        } else {
+          // Non-zero mate: Stockfish reports positive if active side is mating, negative if active side is getting mated
+          let absoluteMate = rawMate;
+          if (activeColor === 'b') {
+            absoluteMate = -rawMate;
+          }
+
+          mateIn = absoluteMate;
+          scoreVal = absoluteMate > 0 ? 100000 : -100000;
+          scoreText = absoluteMate > 0 ? `+M${Math.abs(absoluteMate)}` : `-M${Math.abs(absoluteMate)}`;
+          evalPercent = absoluteMate > 0 ? 100 : 0;
+        }
       }
     }
 
-    // Calculate Winning Probability percentage for the eval bar
-    let evalPercent = 50;
-    if (isMate) {
-      evalPercent = mateIn > 0 ? 100 : 0;
-    } else {
+    // Calculate Winning Probability percentage for the eval bar (if not mate)
+    if (!isMate) {
       // Standard Lichess winning chance sigmoid curve
       const cp = scoreVal;
       const winChance = 2 / (1 + Math.exp(-0.00368208 * cp)) - 1;
@@ -311,3 +329,4 @@ class StockfishService {
 }
 
 export const stockfishService = new StockfishService();
+

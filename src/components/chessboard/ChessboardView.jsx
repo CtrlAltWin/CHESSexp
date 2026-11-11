@@ -18,7 +18,7 @@ const BOARD_THEMES = {
   blue: {
     light: '#e1e7ed',
     dark: '#68889e',
-    name: 'Ocean Blue'
+    name: 'Neo Blue'
   },
   wood: {
     light: '#f0d9b5',
@@ -199,3 +199,4 @@ export default function ChessboardView({ boardWidth }) {
     </div>
   );
 }
+

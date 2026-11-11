@@ -106,7 +106,7 @@ export default function GameImportModal() {
                     : 'border-transparent text-slate-400 hover:text-slate-200'
                 }`}
               >
-                Chess.com Account
+                My Chess.com Account
               </button>
               <button
                 onClick={() => setActiveTab('sample')}
@@ -116,7 +116,7 @@ export default function GameImportModal() {
                     : 'border-transparent text-slate-400 hover:text-slate-200'
                 }`}
               >
-                Sample Opponents
+                Sample Grandmasters
               </button>
               <button
                 onClick={() => setActiveTab('pgn')}
@@ -207,14 +207,14 @@ export default function GameImportModal() {
             <form onSubmit={handleStartChessComImport} className="flex flex-col gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Chess.com Username
+                  Your Chess.com Username
                 </label>
                 <div className="relative">
                   <User className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
                   <input
                     type="text"
                     required
-                    placeholder="e.g. magnuscarlsen, hikaru, or your username"
+                    placeholder="Enter your Chess.com username..."
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className="w-full pl-9 pr-3 py-2.5 bg-brand-surface border border-brand-border rounded-xl text-slate-100 text-xs focus:outline-none focus:border-brand-accent transition-colors"
@@ -239,8 +239,8 @@ export default function GameImportModal() {
               </div>
 
               <div className="p-3 bg-brand-surface rounded-xl border border-brand-border/60 text-[11px] text-slate-400 leading-relaxed">
-                <strong className="text-slate-300 block mb-0.5">Personalized Statistics Guarantee:</strong>
-                All opening continuations, win/loss rates, and transpositions will be calculated strictly from this account's historical games. No synthetic master databases are used.
+                <strong className="text-slate-300 block mb-0.5">Personalized Repertoire Guarantee:</strong>
+                All opening continuations, win/loss rates, and transpositions will be calculated strictly from your personal games. You will explore your own moves, identify your weaknesses, and prepare with Stockfish 19.
               </div>
 
               <button
@@ -248,7 +248,7 @@ export default function GameImportModal() {
                 disabled={!username.trim()}
                 className="mt-2 w-full py-2.5 rounded-xl bg-brand-accent hover:bg-brand-accentHover text-slate-950 font-bold text-xs transition-smooth disabled:opacity-40"
               >
-                Fetch & Index Games
+                Fetch & Index My Games
               </button>
             </form>
           )}
@@ -257,7 +257,7 @@ export default function GameImportModal() {
           {!isImporting && !isSuccess && activeTab === 'sample' && (
             <div className="flex flex-col gap-2.5">
               <p className="text-xs text-slate-400 mb-1">
-                Select a top grandmaster opponent profile to instantly explore their historical opening repertoire without waiting for downloads:
+                Explore a top grandmaster's personal opening repertoire to test the platform immediately:
               </p>
 
               {SAMPLE_PROFILES.map((prof) => (
@@ -339,3 +339,4 @@ export default function GameImportModal() {
     </div>
   );
 }
+

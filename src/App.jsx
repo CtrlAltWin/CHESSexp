@@ -18,6 +18,12 @@ import { loadProfilesAsync, setSelectedProfile } from './store/slices/opponentSl
 import { loadSampleDatasetAsync, openImportModal } from './store/slices/importSlice';
 import { fetchPositionStatsAsync } from './store/slices/explorerSlice';
 import { updateEvaluation } from './store/slices/engineSlice';
+import { 
+  undoMove, 
+  redoMove, 
+  jumpToMove, 
+  flipBoard 
+} from './store/slices/chessboardSlice';
 import { stockfishService } from './services/engine/stockfishService';
 
 import { 
@@ -117,6 +123,40 @@ export default function App() {
     };
   }, [fen, engineEnabled, maxDepth, multiPV, dispatch]);
 
+  // Keyboard controls for move history and board interaction
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Ignore when user is typing in inputs or when modals are open
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+        return;
+      }
+      if (settingsOpen || fenPgnOpen) {
+        return;
+      }
+
+      if (e.key === 'ArrowLeft' || e.key === 'j' || e.key === 'h') {
+        e.preventDefault();
+        dispatch(undoMove());
+      } else if (e.key === 'ArrowRight' || e.key === 'k' || e.key === 'l') {
+        e.preventDefault();
+        dispatch(redoMove());
+      } else if (e.key === 'ArrowUp' || e.key === 'Home') {
+        e.preventDefault();
+        dispatch(jumpToMove(-1));
+      } else if (e.key === 'ArrowDown' || e.key === 'End') {
+        e.preventDefault();
+        dispatch(jumpToMove(history.length - 1));
+      } else if (e.key === 'f' || e.key === 'x') {
+        e.preventDefault();
+        dispatch(flipBoard());
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [history.length, settingsOpen, fenPgnOpen, dispatch]);
+
   return (
     <div className="min-h-screen bg-brand-bg text-slate-100 flex flex-col overflow-x-hidden">
       
@@ -138,10 +178,10 @@ export default function App() {
             
             {/* Desktop Left Column: Profiles & Fast Navigation (hidden on mobile, visible >= 1280px or 1024px) */}
             <aside className="hidden xl:flex xl:col-span-2 flex-col gap-3">
-              {/* Opponent & Database Overview Card */}
+              {/* User Repertoire Overview Card */}
               <div className="p-3.5 bg-brand-surface border border-brand-border rounded-xl flex flex-col gap-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Database</span>
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">My Repertoire</span>
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand-accent/15 text-brand-accent font-bold">
                     Personalized
                   </span>
@@ -153,7 +193,7 @@ export default function App() {
                   </div>
                   <div className="flex flex-col truncate">
                     <strong className="text-xs text-slate-100 truncate">{selectedProfile}</strong>
-                    <span className="text-[10px] text-slate-400">Exclusive Source</span>
+                    <span className="text-[10px] text-slate-400">Primary Account</span>
                   </div>
                 </div>
 
@@ -162,14 +202,14 @@ export default function App() {
                   className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-brand-card hover:bg-brand-hover border border-brand-border text-xs font-semibold text-slate-200 transition-smooth"
                 >
                   <DownloadCloud className="w-3.5 h-3.5 text-brand-accent" />
-                  <span>Import Opponent</span>
+                  <span>Import My Games</span>
                 </button>
               </div>
 
               {/* Quick Profile Switcher */}
               <div className="p-3 bg-brand-surface border border-brand-border rounded-xl flex flex-col gap-2 flex-1 max-h-[380px] overflow-y-auto">
                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  Switch Opponent
+                  Switch Account
                 </span>
                 <div className="flex flex-col gap-1">
                   {profiles.map((p) => {
@@ -196,8 +236,8 @@ export default function App() {
 
               {/* Lab Philosophy Badge */}
               <div className="p-3 bg-brand-surface/60 border border-brand-border/60 rounded-xl text-[11px] text-slate-400 leading-relaxed">
-                <strong className="text-slate-300 block mb-1">CHESSexp Guarantee</strong>
-                Move frequencies and win rates are computed exclusively from this player's actual games. No generic global stats.
+                <strong className="text-slate-300 block mb-1">Your Personal Chess Lab</strong>
+                Opening statistics are built strictly from your own games. Discover what moves you actually play, find where you struggle, and prepare responses with Stockfish 19.
               </div>
             </aside>
 
@@ -347,3 +387,4 @@ export default function App() {
     </div>
   );
 }
+

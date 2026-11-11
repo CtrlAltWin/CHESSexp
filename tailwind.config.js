@@ -9,14 +9,16 @@ export default {
     extend: {
       colors: {
         brand: {
-          bg: '#0c1017',
-          surface: '#141b24',
-          card: '#1a2230',
-          hover: '#242e40',
-          border: '#2a364a',
-          accent: '#48c774', // Chess-inspired vibrant green for 'exp' wordmark & highlights
-          accentHover: '#3eb367',
-          accentMuted: 'rgba(72, 199, 116, 0.15)',
+          bg: 'var(--bg-primary)',
+          surface: 'var(--bg-surface)',
+          card: 'var(--bg-card)',
+          hover: 'var(--bg-hover)',
+          border: 'var(--border-primary)',
+          accent: 'var(--brand-accent)',
+          accentHover: 'var(--brand-accent-hover)',
+          accentMuted: 'var(--brand-accent-muted)',
+          text: 'var(--text-primary)',
+          textMuted: 'var(--text-muted)',
           whiteWin: '#ffffff',
           draw: '#94a3b8',
           blackWin: '#1e293b',

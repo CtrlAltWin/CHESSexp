@@ -265,3 +265,4 @@ export default function RepertoireDashboard({ onAnalyzeOpening }) {
     </div>
   );
 }
+

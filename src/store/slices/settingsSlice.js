@@ -51,3 +51,4 @@ export const {
 } = settingsSlice.actions;
 
 export default settingsSlice.reducer;
+
