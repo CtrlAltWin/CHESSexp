@@ -19,7 +19,7 @@ export default function OpeningExplorer() {
   const dispatch = useDispatch();
   const { positionStats, mode, isLoading } = useSelector((state) => state.explorer);
   const { selectedProfile, profiles } = useSelector((state) => state.opponent);
-  const { normFen, history } = useSelector((state) => state.chessboard);
+  const { normFen, history, currentMoveIndex } = useSelector((state) => state.chessboard);
 
   const activeProfileObj = profiles.find(p => p.username === selectedProfile) || {
     displayName: selectedProfile,
@@ -28,7 +28,9 @@ export default function OpeningExplorer() {
 
   const handleModeChange = (newMode) => {
     dispatch(setExplorerMode(newMode));
-    const lineMoves = history.map(h => h.san);
+    const lineMoves = currentMoveIndex >= 0 
+      ? history.slice(0, currentMoveIndex + 1).map(h => h.san) 
+      : [];
     dispatch(fetchPositionStatsAsync({
       profileUsername: selectedProfile,
       normFen,

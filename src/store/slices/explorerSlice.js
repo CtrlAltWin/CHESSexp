@@ -1,28 +1,16 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { getPositionStats, getExactLineStats } from '../../services/storage/dbOperations';
+import { getPositionStats, getExactLineFullStats } from '../../services/storage/dbOperations';
 
 export const fetchPositionStatsAsync = createAsyncThunk(
   'explorer/fetchPositionStats',
-  async ({ profileUsername, normFen, lineMoves, mode }, { getState }) => {
+  async ({ profileUsername, normFen, lineMoves, mode }) => {
     if (!profileUsername || !normFen) return null;
 
     if (mode === 'exact' && lineMoves && lineMoves.length > 0) {
-      const matchingGameIds = await getExactLineStats(profileUsername, lineMoves);
-      // For exact mode, return continuation stats matching the exact line
-      const baseStats = await getPositionStats(profileUsername, normFen);
-      if (baseStats && matchingGameIds) {
-        // Filter continuations to only those present in exact line games
-        return {
-          ...baseStats,
-          gameIds: matchingGameIds,
-          gamesCount: matchingGameIds.length
-        };
-      }
-      return baseStats;
+      return await getExactLineFullStats(profileUsername, lineMoves, normFen);
     }
 
-    const stats = await getPositionStats(profileUsername, normFen);
-    return stats;
+    return await getPositionStats(profileUsername, normFen);
   }
 );
 

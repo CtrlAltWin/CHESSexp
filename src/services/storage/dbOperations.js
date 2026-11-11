@@ -223,6 +223,14 @@ export async function indexGamesForProfile(profileUsername, rawGames, onProgress
     const replayChess = new Chess();
     const maxPliesToIndex = Math.min(moves.length, 50);
 
+    // Track positions and continuations already visited in THIS game to prevent multi-count
+    const visitedFensInThisGame = new Set();
+    const visitedContsInThisGame = new Set();
+
+    const isUserWin = (isUserWhite && boardResult === '1-0') || (isUserBlack && boardResult === '0-1');
+    const isUserLoss = (isUserWhite && boardResult === '0-1') || (isUserBlack && boardResult === '1-0');
+    const isUserDraw = boardResult === '1/2-1/2';
+
     for (let ply = 0; ply <= maxPliesToIndex; ply++) {
       const currentNormFen = normalizeFen(replayChess.fen());
       const nextMove = moves[ply]; // null at end
@@ -237,25 +245,36 @@ export async function indexGamesForProfile(profileUsername, rawGames, onProgress
           whiteWins: 0,
           draws: 0,
           blackWins: 0,
+          userWins: 0,
+          userDraws: 0,
+          userLosses: 0,
           continuations: {},
           gameIds: []
         };
         positionsCache.set(currentNormFen, posData);
       }
 
-      posData.gamesCount++;
-      if (boardResult === '1-0') posData.whiteWins++;
-      else if (boardResult === '0-1') posData.blackWins++;
-      else posData.draws++;
+      // Only count game once per position
+      if (!visitedFensInThisGame.has(currentNormFen)) {
+        visitedFensInThisGame.add(currentNormFen);
+        if (!posData.gameIds.includes(gameId)) {
+          posData.gameIds.push(gameId);
+          posData.gamesCount = posData.gameIds.length;
+          if (boardResult === '1-0') posData.whiteWins = (posData.whiteWins || 0) + 1;
+          else if (boardResult === '0-1') posData.blackWins = (posData.blackWins || 0) + 1;
+          else posData.draws = (posData.draws || 0) + 1;
 
-      if (!posData.gameIds.includes(gameId)) {
-        posData.gameIds.push(gameId);
+          if (isUserWin) posData.userWins = (posData.userWins || 0) + 1;
+          else if (isUserLoss) posData.userLosses = (posData.userLosses || 0) + 1;
+          else if (isUserDraw) posData.userDraws = (posData.userDraws || 0) + 1;
+        }
       }
 
       // If there is a next continuation move
       if (nextMove) {
         const san = nextMove.san;
         const uci = `${nextMove.from}${nextMove.to}${nextMove.promotion || ''}`;
+        const contKey = `${currentNormFen}_${san}`;
 
         if (!posData.continuations[san]) {
           posData.continuations[san] = {
@@ -267,38 +286,45 @@ export async function indexGamesForProfile(profileUsername, rawGames, onProgress
             whiteWins: 0,
             draws: 0,
             blackWins: 0,
+            userWins: 0,
+            userDraws: 0,
+            userLosses: 0,
             gameIds: []
           };
         }
 
         const cont = posData.continuations[san];
-        cont.gamesCount++;
-        if (boardResult === '1-0') cont.whiteWins++;
-        else if (boardResult === '0-1') cont.blackWins++;
-        else cont.draws++;
+        if (!visitedContsInThisGame.has(contKey)) {
+          visitedContsInThisGame.add(contKey);
+          if (!cont.gameIds.includes(gameId)) {
+            cont.gameIds.push(gameId);
+            cont.gamesCount = cont.gameIds.length;
+            if (boardResult === '1-0') cont.whiteWins = (cont.whiteWins || 0) + 1;
+            else if (boardResult === '0-1') cont.blackWins = (cont.blackWins || 0) + 1;
+            else cont.draws = (cont.draws || 0) + 1;
 
-        if (!cont.gameIds.includes(gameId)) {
-          cont.gameIds.push(gameId);
+            if (isUserWin) cont.userWins = (cont.userWins || 0) + 1;
+            else if (isUserLoss) cont.userLosses = (cont.userLosses || 0) + 1;
+            else if (isUserDraw) cont.userDraws = (cont.userDraws || 0) + 1;
+          }
         }
 
         // Apply move to replayChess for next ply
         replayChess.move(nextMove);
 
-        // Record exact line up to 20 plies
-        if (ply < 20) {
-          const lineKey = sanMoves.slice(0, ply + 1).join(' ');
-          let lineData = linesCache.get(lineKey);
-          if (!lineData) {
-            lineData = {
-              profileUsername: normUser,
-              lineKey,
-              gameIds: []
-            };
-            linesCache.set(lineKey, lineData);
-          }
-          if (!lineData.gameIds.includes(gameId)) {
-            lineData.gameIds.push(gameId);
-          }
+        // Record exact line up to maxPliesToIndex
+        const lineKey = sanMoves.slice(0, ply + 1).join(' ');
+        let lineData = linesCache.get(lineKey);
+        if (!lineData) {
+          lineData = {
+            profileUsername: normUser,
+            lineKey,
+            gameIds: []
+          };
+          linesCache.set(lineKey, lineData);
+        }
+        if (!lineData.gameIds.includes(gameId)) {
+          lineData.gameIds.push(gameId);
         }
       }
     }
@@ -406,34 +432,123 @@ export async function getPositionStats(profileUsername, normFen) {
     };
   }
 
-  const { gamesCount, whiteWins, draws, blackWins, continuations, gameIds } = posData;
+  const gameIds = posData.gameIds || [];
+  if (gameIds.length === 0) {
+    return {
+      gamesCount: 0,
+      whiteWins: 0,
+      draws: 0,
+      blackWins: 0,
+      whiteWinPct: 0,
+      drawPct: 0,
+      blackWinPct: 0,
+      moves: [],
+      gameIds: []
+    };
+  }
+
+  // Load actual games from DB to calculate 100% verified, consistent stats
+  // and heal any legacy doubled/corrupted counts in posData
+  const gamesMap = new Map();
+  for (const id of gameIds) {
+    const g = await db.get('games', id);
+    if (g) gamesMap.set(id, g);
+  }
+
+  const validGames = Array.from(gamesMap.values());
+  const gamesCount = validGames.length > 0 ? validGames.length : gameIds.length;
+
+  let whiteWins = 0, draws = 0, blackWins = 0;
+  if (validGames.length > 0) {
+    for (const g of validGames) {
+      const br = g.boardResult || '1/2-1/2';
+      if (br === '1-0') whiteWins++;
+      else if (br === '0-1') blackWins++;
+      else draws++;
+    }
+  } else {
+    // If games not loaded yet, normalize raw posData so sum strictly equals gamesCount
+    const rawW = posData.whiteWins || 0;
+    const rawD = posData.draws || 0;
+    const rawB = posData.blackWins || 0;
+    const rawTot = rawW + rawD + rawB;
+    if (rawTot > 0) {
+      whiteWins = Math.round((rawW / rawTot) * gamesCount);
+      draws = Math.round((rawD / rawTot) * gamesCount);
+      blackWins = Math.max(0, gamesCount - whiteWins - draws);
+    }
+  }
 
   const whiteWinPct = gamesCount > 0 ? Math.round((whiteWins / gamesCount) * 100) : 0;
   const drawPct = gamesCount > 0 ? Math.round((draws / gamesCount) * 100) : 0;
   const blackWinPct = gamesCount > 0 ? Math.max(0, 100 - whiteWinPct - drawPct) : 0;
 
-  // Convert continuations map to sorted array
-  const moves = Object.values(continuations || {}).map(c => {
-    const freq = gamesCount > 0 ? ((c.gamesCount / gamesCount) * 100).toFixed(1) : '0';
-    const wPct = c.gamesCount > 0 ? Math.round((c.whiteWins / c.gamesCount) * 100) : 0;
-    const dPct = c.gamesCount > 0 ? Math.round((c.draws / c.gamesCount) * 100) : 0;
-    const bPct = c.gamesCount > 0 ? Math.max(0, 100 - wPct - dPct) : 0;
+  // Active turn on board determines who played the continuation move
+  const activeColor = normFen.split(' ')[1] || 'w';
+
+  // Convert continuations map to sorted array with verified, mathematically consistent counts
+  const moves = Object.values(posData.continuations || {}).map(c => {
+    const cGameIds = c.gameIds || [];
+    let cWhiteWins = 0, cDraws = 0, cBlackWins = 0;
+    let cUserWins = 0, cUserDraws = 0;
+
+    if (validGames.length > 0 && cGameIds.length > 0) {
+      for (const gid of cGameIds) {
+        const g = gamesMap.get(gid);
+        if (!g) continue;
+        const br = g.boardResult || '1/2-1/2';
+        if (br === '1-0') cWhiteWins++;
+        else if (br === '0-1') cBlackWins++;
+        else cDraws++;
+
+        const isUserWhite = (g.white?.username || '').toLowerCase() === normUser;
+        const isUserBlack = (g.black?.username || '').toLowerCase() === normUser;
+        const isWon = (isUserWhite && br === '1-0') || (isUserBlack && br === '0-1');
+        const isDraw = br === '1/2-1/2';
+        if (isWon) cUserWins++;
+        else if (isDraw) cUserDraws++;
+      }
+    } else {
+      // Safe fallback if games not in store
+      const cRawTot = (c.whiteWins || 0) + (c.draws || 0) + (c.blackWins || 0);
+      const cCnt = cGameIds.length > 0 ? cGameIds.length : (c.gamesCount || 0);
+      if (cRawTot > 0) {
+        cWhiteWins = Math.round(((c.whiteWins || 0) / cRawTot) * cCnt);
+        cDraws = Math.round(((c.draws || 0) / cRawTot) * cCnt);
+        cBlackWins = Math.max(0, cCnt - cWhiteWins - cDraws);
+      }
+      cUserWins = Math.min(cCnt, c.userWins !== undefined ? c.userWins : (activeColor === 'w' ? cWhiteWins : cBlackWins));
+      cUserDraws = Math.min(cCnt - cUserWins, c.userDraws !== undefined ? c.userDraws : cDraws);
+    }
+
+    const cGamesCount = (cWhiteWins + cDraws + cBlackWins) || cGameIds.length || (c.gamesCount || 0);
+    const freq = gamesCount > 0 ? ((cGamesCount / gamesCount) * 100).toFixed(1) : '0';
+
+    const wPct = cGamesCount > 0 ? Math.round((cWhiteWins / cGamesCount) * 100) : 0;
+    const dPct = cGamesCount > 0 ? Math.round((cDraws / cGamesCount) * 100) : 0;
+    const bPct = cGamesCount > 0 ? Math.max(0, 100 - wPct - dPct) : 0;
+
+    // Personal score clamped strictly between 0% and 100%
+    const rawScore = cGamesCount > 0 
+      ? Math.round(((cUserWins + cUserDraws * 0.5) / cGamesCount) * 100) 
+      : 0;
+    const scorePct = Math.min(100, Math.max(0, rawScore));
 
     return {
       san: c.san,
       uci: c.uci,
       from: c.from,
       to: c.to,
-      gamesCount: c.gamesCount,
+      gamesCount: cGamesCount,
       frequencyPct: parseFloat(freq),
-      whiteWins: c.whiteWins,
-      draws: c.draws,
-      blackWins: c.blackWins,
+      whiteWins: cWhiteWins,
+      draws: cDraws,
+      blackWins: cBlackWins,
       whiteWinPct: wPct,
       drawPct: dPct,
       blackWinPct: bPct,
-      scorePct: Math.round(wPct + dPct * 0.5),
-      gameIds: c.gameIds || []
+      scorePct,
+      gameIds: cGameIds
     };
   }).sort((a, b) => b.gamesCount - a.gamesCount);
 
@@ -446,7 +561,7 @@ export async function getPositionStats(profileUsername, normFen) {
     drawPct,
     blackWinPct,
     moves,
-    gameIds: gameIds || []
+    gameIds
   };
 }
 
@@ -466,6 +581,166 @@ export async function getExactLineStats(profileUsername, lineMoves) {
 
   // Get matching games
   return lineData.gameIds;
+}
+
+/**
+ * Retrieves full Opening Explorer statistics for an exact move line.
+ * Guarantees that gamesCount, results bar, candidate moves, and matching games tab
+ * all operate on the exact same underlying games that followed this exact move order.
+ */
+export async function getExactLineFullStats(profileUsername, lineMoves, normFen) {
+  if (!profileUsername || !lineMoves || lineMoves.length === 0) {
+    return getPositionStats(profileUsername, normFen);
+  }
+  const normUser = profileUsername.toLowerCase();
+  const db = await getDb();
+
+  const lineKey = lineMoves.join(' ');
+  const lineData = await db.get('lines', [normUser, lineKey]);
+  if (!lineData || !lineData.gameIds || lineData.gameIds.length === 0) {
+    return {
+      gamesCount: 0,
+      whiteWins: 0,
+      draws: 0,
+      blackWins: 0,
+      whiteWinPct: 0,
+      drawPct: 0,
+      blackWinPct: 0,
+      moves: [],
+      gameIds: []
+    };
+  }
+
+  const matchingGameIds = lineData.gameIds;
+  const games = [];
+  for (const id of matchingGameIds) {
+    const g = await db.get('games', id);
+    if (g) games.push(g);
+  }
+
+  const gamesCount = games.length;
+  if (gamesCount === 0) {
+    return {
+      gamesCount: 0,
+      whiteWins: 0,
+      draws: 0,
+      blackWins: 0,
+      whiteWinPct: 0,
+      drawPct: 0,
+      blackWinPct: 0,
+      moves: [],
+      gameIds: []
+    };
+  }
+
+  let whiteWins = 0, draws = 0, blackWins = 0;
+  const continuationsMap = new Map();
+  const plyIndex = lineMoves.length; // 0-based index of continuation move
+
+  for (const game of games) {
+    const boardResult = game.boardResult || '1/2-1/2';
+    if (boardResult === '1-0') whiteWins++;
+    else if (boardResult === '0-1') blackWins++;
+    else draws++;
+
+    const isUserWhite = (game.white?.username || '').toLowerCase() === normUser;
+    const isUserBlack = (game.black?.username || '').toLowerCase() === normUser;
+    const isUserWin = (isUserWhite && boardResult === '1-0') || (isUserBlack && boardResult === '0-1');
+    const isUserDraw = boardResult === '1/2-1/2';
+
+    // Next continuation move in this exact line
+    const nextSan = game.moves ? game.moves[plyIndex] : null;
+    if (nextSan) {
+      if (!continuationsMap.has(nextSan)) {
+        continuationsMap.set(nextSan, {
+          san: nextSan,
+          gamesCount: 0,
+          whiteWins: 0,
+          draws: 0,
+          blackWins: 0,
+          userWins: 0,
+          userDraws: 0,
+          gameIds: []
+        });
+      }
+      const cont = continuationsMap.get(nextSan);
+      cont.gamesCount++;
+      if (boardResult === '1-0') cont.whiteWins++;
+      else if (boardResult === '0-1') cont.blackWins++;
+      else cont.draws++;
+
+      if (isUserWin) cont.userWins++;
+      else if (isUserDraw) cont.userDraws++;
+
+      if (!cont.gameIds.includes(game.id)) {
+        cont.gameIds.push(game.id);
+      }
+    }
+  }
+
+  const whiteWinPct = Math.round((whiteWins / gamesCount) * 100);
+  const drawPct = Math.round((draws / gamesCount) * 100);
+  const blackWinPct = Math.max(0, 100 - whiteWinPct - drawPct);
+
+  // Compute chess details (from, to, uci) for candidate moves using Chess
+  let chessReplay = null;
+  try {
+    chessReplay = new Chess();
+    for (const m of lineMoves) {
+      chessReplay.move(m);
+    }
+  } catch (e) {}
+
+  const moves = Array.from(continuationsMap.values()).map(c => {
+    let from = '', to = '', uci = '';
+    if (chessReplay) {
+      try {
+        const testChess = new Chess(chessReplay.fen());
+        const moveRes = testChess.move(c.san);
+        if (moveRes) {
+          from = moveRes.from;
+          to = moveRes.to;
+          uci = `${moveRes.from}${moveRes.to}${moveRes.promotion || ''}`;
+        }
+      } catch (e) {}
+    }
+
+    const freq = ((c.gamesCount / gamesCount) * 100).toFixed(1);
+    const wPct = Math.round((c.whiteWins / c.gamesCount) * 100);
+    const dPct = Math.round((c.draws / c.gamesCount) * 100);
+    const bPct = Math.max(0, 100 - wPct - dPct);
+
+    const scorePct = Math.round(((c.userWins + c.userDraws * 0.5) / c.gamesCount) * 100);
+
+    return {
+      san: c.san,
+      uci,
+      from,
+      to,
+      gamesCount: c.gamesCount,
+      frequencyPct: parseFloat(freq),
+      whiteWins: c.whiteWins,
+      draws: c.draws,
+      blackWins: c.blackWins,
+      whiteWinPct: wPct,
+      drawPct: dPct,
+      blackWinPct: bPct,
+      scorePct,
+      gameIds: c.gameIds
+    };
+  }).sort((a, b) => b.gamesCount - a.gamesCount);
+
+  return {
+    gamesCount,
+    whiteWins,
+    draws,
+    blackWins,
+    whiteWinPct,
+    drawPct,
+    blackWinPct,
+    moves,
+    gameIds: games.map(g => g.id)
+  };
 }
 
 /**
@@ -491,7 +766,7 @@ export async function getGamesByIds(gameIds, filters = {}) {
     }
 
     if (filters.color && filters.color !== 'all') {
-      const isWhite = game.white.username.toLowerCase() === game.profileUsername;
+      const isWhite = (game.white?.username || '').toLowerCase() === (game.profileUsername || '').toLowerCase();
       if (filters.color === 'white' && !isWhite) continue;
       if (filters.color === 'black' && isWhite) continue;
     }

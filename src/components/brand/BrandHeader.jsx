@@ -31,7 +31,7 @@ export default function BrandHeader({
   const { selectedProfile, profiles } = useSelector((state) => state.opponent);
   const { theme, soundEnabled } = useSelector((state) => state.settings);
   const { isAnalyzingGame, selectedGame } = useSelector((state) => state.games);
-  const normFen = useSelector((state) => state.chessboard.normFen);
+  const { normFen, history, currentMoveIndex } = useSelector((state) => state.chessboard);
   const mode = useSelector((state) => state.explorer.mode);
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -44,22 +44,26 @@ export default function BrandHeader({
 
   const handleSelectProfile = (username) => {
     dispatch(setSelectedProfile(username));
+    const lineMoves = currentMoveIndex >= 0 
+      ? history.slice(0, currentMoveIndex + 1).map(h => h.san) 
+      : [];
     dispatch(fetchPositionStatsAsync({
       profileUsername: username,
       normFen,
+      lineMoves,
       mode
     }));
     setDropdownOpen(false);
   };
 
   return (
-    <header className="bg-brand-surface border-b border-brand-border sticky top-0 z-40 select-none">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 h-14 flex items-center justify-between gap-2 sm:gap-4">
+    <header className="bg-brand-surface border-b border-brand-border sticky top-0 z-40 select-none w-full">
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 h-14 flex items-center justify-between gap-1.5 sm:gap-4 overflow-hidden">
         
         {/* Brand Wordmark & Logo */}
-        <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => setActiveView('analysis')}>
-          <BishopLogo size={34} tiltAngle={16} accentColor="#48c774" withGlow />
-          <div className="flex items-baseline tracking-tight font-extrabold text-lg sm:text-xl">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 cursor-pointer flex-shrink-0" onClick={() => setActiveView('analysis')}>
+          <BishopLogo size={30} tiltAngle={16} accentColor="#48c774" withGlow />
+          <div className="flex items-baseline tracking-tight font-extrabold text-base sm:text-xl">
             <span className="text-slate-100 font-black tracking-wider">CHESS</span>
             <span className="text-brand-accent ml-0.5 font-bold">exp</span>
           </div>
@@ -69,26 +73,26 @@ export default function BrandHeader({
         </div>
 
         {/* Center: Repertoire / Account Selector */}
-        <div className="relative">
+        <div className="relative min-w-0 flex-shrink">
           <button
             onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-brand-card hover:bg-brand-hover border border-brand-border text-xs sm:text-sm font-medium transition-smooth max-w-[200px] sm:max-w-[270px]"
+            className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg bg-brand-card hover:bg-brand-hover border border-brand-border text-xs sm:text-sm font-medium transition-smooth max-w-[130px] sm:max-w-[240px] truncate"
             title="Switch Player Repertoire"
           >
             <Users className="w-3.5 h-3.5 text-brand-accent flex-shrink-0" />
-            <div className="flex flex-col text-left truncate">
-              <span className="text-[10px] text-slate-400 leading-tight">My Repertoire</span>
-              <span className="truncate text-slate-200 font-semibold leading-tight">
+            <div className="flex flex-col text-left truncate min-w-0">
+              <span className="hidden sm:inline text-[10px] text-slate-400 leading-tight">My Repertoire</span>
+              <span className="truncate text-slate-200 font-semibold leading-tight text-[11px] sm:text-xs">
                 {selectedProfile ? (activeProfObj?.displayName || activeProfObj?.username) : 'Connect Account'}
               </span>
             </div>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-auto flex-shrink-0" />
+            <ChevronDown className="w-3 h-3 text-slate-400 ml-auto flex-shrink-0" />
           </button>
 
           {/* Profile Dropdown Menu */}
           {dropdownOpen && (
             <div 
-              className="absolute left-0 sm:right-0 sm:left-auto mt-1 w-72 bg-brand-card border border-brand-border rounded-xl shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100"
+              className="absolute left-0 sm:right-0 sm:left-auto mt-1 w-64 sm:w-72 bg-brand-card border border-brand-border rounded-xl shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100"
               onMouseLeave={() => setDropdownOpen(false)}
             >
               <div className="px-3 py-1.5 border-b border-brand-border/60 text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex justify-between items-center">
@@ -169,21 +173,21 @@ export default function BrandHeader({
         </div>
 
         {/* Right Tools & Nav Controls */}
-        <div className="flex items-center gap-1 sm:gap-2">
-          {/* Import Button */}
+        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+          {/* Import Button (Desktop & Tablet) */}
           <button
             onClick={() => dispatch(openImportModal())}
-            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-brand-card hover:bg-brand-hover border border-brand-border text-xs font-medium text-slate-200 transition-smooth touch-target sm:min-h-0"
+            className="hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-brand-card hover:bg-brand-hover border border-brand-border text-xs font-medium text-slate-200 transition-smooth touch-target sm:min-h-0"
             title="Import Chess.com Account or PGN"
           >
             <DownloadCloud className="w-4 h-4 text-brand-accent" />
             <span className="hidden sm:inline">Import</span>
           </button>
 
-          {/* Repertoire Dashboard Switcher */}
+          {/* Repertoire Dashboard Switcher (Desktop) */}
           <button
             onClick={() => setActiveView(activeView === 'dashboard' ? 'analysis' : 'dashboard')}
-            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border text-xs font-medium transition-smooth touch-target sm:min-h-0 ${
+            className={`hidden md:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border text-xs font-medium transition-smooth touch-target sm:min-h-0 ${
               activeView === 'dashboard'
                 ? 'bg-brand-accent/20 border-brand-accent text-brand-accent'
                 : 'bg-brand-card hover:bg-brand-hover border-brand-border text-slate-200'
@@ -191,37 +195,37 @@ export default function BrandHeader({
             title="Personal Repertoire Dashboard"
           >
             <BarChart2 className="w-4 h-4" />
-            <span className="hidden md:inline">Dashboard</span>
+            <span>Dashboard</span>
           </button>
 
           {/* Audio toggle */}
           <button
             onClick={() => dispatch(toggleSound())}
-            className="p-2 rounded-lg bg-brand-card hover:bg-brand-hover border border-brand-border text-slate-300 hover:text-white transition-smooth touch-target sm:min-h-0"
+            className="p-1.5 sm:p-2 rounded-lg bg-brand-card hover:bg-brand-hover border border-brand-border text-slate-300 hover:text-white transition-smooth"
             title={soundEnabled ? 'Mute Sounds' : 'Unmute Sounds'}
             aria-label="Toggle Sound"
           >
-            {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4 text-slate-500" />}
+            {soundEnabled ? <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500" />}
           </button>
 
           {/* Theme toggle */}
           <button
             onClick={() => dispatch(setTheme(theme === 'dark' ? 'light' : 'dark'))}
-            className="p-2 rounded-lg bg-brand-card hover:bg-brand-hover border border-brand-border text-slate-300 hover:text-white transition-smooth touch-target sm:min-h-0"
+            className="p-1.5 sm:p-2 rounded-lg bg-brand-card hover:bg-brand-hover border border-brand-border text-slate-300 hover:text-white transition-smooth"
             title="Toggle Light / Dark Theme"
             aria-label="Toggle Theme"
           >
-            {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-400" />}
+            {theme === 'dark' ? <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" /> : <Moon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" />}
           </button>
 
           {/* Settings button */}
           <button
             onClick={onOpenSettings}
-            className="p-2 rounded-lg bg-brand-card hover:bg-brand-hover border border-brand-border text-slate-300 hover:text-white transition-smooth touch-target sm:min-h-0"
+            className="p-1.5 sm:p-2 rounded-lg bg-brand-card hover:bg-brand-hover border border-brand-border text-slate-300 hover:text-white transition-smooth"
             title="Preferences & Settings"
             aria-label="Settings"
           >
-            <Settings className="w-4 h-4" />
+            <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
         </div>
 

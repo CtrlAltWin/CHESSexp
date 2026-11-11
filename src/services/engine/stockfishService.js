@@ -8,9 +8,10 @@ class StockfishService {
   constructor() {
     this.worker = null;
     this.isReady = false;
-    this.isAnalyzing = false;
+    this.isSearching = false;
     this.currentFen = null;
-    this.analysisToken = 0;
+    this.pendingAnalysis = null;
+    this.stopTimeout = null;
     this.multiPV = 2; // Default 2 candidate lines
     this.maxDepth = 18;
     this.callbacks = {
@@ -22,13 +23,21 @@ class StockfishService {
     this.variations = [];
   }
 
+  get isAnalyzing() {
+    return this.isSearching;
+  }
+  set isAnalyzing(val) {
+    this.isSearching = Boolean(val);
+  }
+
   /**
    * Initializes the Stockfish 19 NNUE Web Worker.
    */
   async init() {
-    if (this.worker) return;
+    if (this.initPromise) return this.initPromise;
+    if (this.isReady && this.worker) return Promise.resolve();
 
-    return new Promise((resolve, reject) => {
+    this.initPromise = new Promise((resolve, reject) => {
       try {
         // Load the Stockfish 19 single-threaded WASM script
         this.worker = new Worker('/stockfish/stockfish-19-lite-single.js');
@@ -63,9 +72,12 @@ class StockfishService {
 
       } catch (err) {
         console.error('Could not initialize Stockfish 19 worker:', err);
+        this.initPromise = null;
         reject(err);
       }
     });
+
+    return this.initPromise;
   }
 
   /**
@@ -89,29 +101,66 @@ class StockfishService {
    * Discards outdated analysis requests immediately.
    */
   stop() {
-    this.analysisToken++;
-    this.isAnalyzing = false;
-    this.sendCommand('stop');
+    this.pendingAnalysis = null;
+    if (this.stopTimeout) {
+      clearTimeout(this.stopTimeout);
+      this.stopTimeout = null;
+    }
+    if (this.isSearching) {
+      this.sendCommand('stop');
+    }
   }
 
   /**
    * Starts analyzing a given position FEN.
+   * If engine is currently searching another position, queues the request and stops the active search first
+   * so trailing 'bestmove' signals from the old search never corrupt or abort the new search.
    */
   analyze(fen, { depth = 18, multiPV = 2 } = {}) {
-    if (!this.worker) {
+    if (!this.worker || !this.isReady) {
       this.init().then(() => this.analyze(fen, { depth, multiPV }));
       return;
     }
 
-    this.stop();
-    this.analysisToken++;
-    const currentToken = this.analysisToken;
+    this.maxDepth = depth;
+    this.multiPV = multiPV;
+
+    // If Stockfish is currently searching, queue this analysis and send stop
+    if (this.isSearching) {
+      this.pendingAnalysis = { fen, depth, multiPV };
+      this.sendCommand('stop');
+
+      // Safeguard timeout: if bestmove does not arrive within 250ms, force start the queued search
+      if (this.stopTimeout) clearTimeout(this.stopTimeout);
+      this.stopTimeout = setTimeout(() => {
+        if (this.pendingAnalysis) {
+          const next = this.pendingAnalysis;
+          this.pendingAnalysis = null;
+          this.isSearching = false;
+          this.startSearch(next.fen, next.depth, next.multiPV);
+        }
+      }, 250);
+      return;
+    }
+
+    // Engine is completely idle: start search immediately
+    this.startSearch(fen, depth, multiPV);
+  }
+
+  /**
+   * Internal helper to dispatch position and go commands to an idle engine.
+   */
+  startSearch(fen, depth, multiPV) {
+    if (this.stopTimeout) {
+      clearTimeout(this.stopTimeout);
+      this.stopTimeout = null;
+    }
 
     this.currentFen = fen;
     this.maxDepth = depth;
     this.multiPV = multiPV;
     this.variations = [];
-    this.isAnalyzing = true;
+    this.isSearching = true;
 
     this.sendCommand(`setoption name MultiPV value ${this.multiPV}`);
     this.sendCommand(`position fen ${fen}`);
@@ -121,19 +170,24 @@ class StockfishService {
   /**
    * Parses standard UCI output messages from Stockfish 19.
    */
-  handleUciMessage(line) {
-    if (typeof line !== 'string') return;
-    const trimmed = line.trim();
+  handleUciMessage(message) {
+    if (typeof message !== 'string') return;
+    const lines = message.split('\n');
 
-    if (trimmed === 'uciok') {
-      this.sendCommand('isready');
-    } else if (trimmed === 'readyok') {
-      this.isReady = true;
-      if (this.callbacks.onReady) this.callbacks.onReady();
-    } else if (trimmed.startsWith('info') && trimmed.includes('score')) {
-      this.parseInfoLine(trimmed);
-    } else if (trimmed.startsWith('bestmove')) {
-      this.parseBestMove(trimmed);
+    for (const rawLine of lines) {
+      const trimmed = rawLine.trim();
+      if (!trimmed) continue;
+
+      if (trimmed === 'uciok') {
+        this.sendCommand('isready');
+      } else if (trimmed === 'readyok') {
+        this.isReady = true;
+        if (this.callbacks.onReady) this.callbacks.onReady();
+      } else if (trimmed.startsWith('info') && trimmed.includes('score')) {
+        this.parseInfoLine(trimmed);
+      } else if (trimmed.startsWith('bestmove')) {
+        this.parseBestMove(trimmed);
+      }
     }
   }
 
@@ -159,14 +213,15 @@ class StockfishService {
     let scoreText = '0.00';
     let isMate = false;
     let mateIn = null;
+    let evalPercent = 50;
 
     if (line.includes('score cp')) {
       const cpMatch = line.match(/score cp (-?\d+)/);
       if (cpMatch) {
         scoreVal = parseInt(cpMatch[1], 10);
         
-        // Stockfish reports score from perspective of active player!
-        // Convert to absolute perspective (positive for White, negative for Black)
+        // Stockfish UCI protocol always reports score from perspective of the active player (side to move).
+        // Standard chess GUI convention (Lichess, Chess.com) requires absolute perspective (+ for White advantage, - for Black advantage).
         const activeColor = this.currentFen.split(' ')[1];
         if (activeColor === 'b') {
           scoreVal = -scoreVal;
@@ -183,7 +238,7 @@ class StockfishService {
         let rawMate = parseInt(mateMatch[1], 10);
         const activeColor = this.currentFen.split(' ')[1]; // 'w' or 'b'
 
-        // If mate 0: active side has 0 legal moves and is checkmated
+        // If mate 0: checkmate position
         if (rawMate === 0) {
           if (activeColor === 'b') {
             // Black is checkmated! White has won!
@@ -199,7 +254,8 @@ class StockfishService {
             evalPercent = 0;
           }
         } else {
-          // Non-zero mate: Stockfish reports positive if active side is mating, negative if active side is getting mated
+          // Stockfish reports positive if side-to-move is mating, negative if side-to-move is being mated.
+          // Convert to absolute perspective:
           let absoluteMate = rawMate;
           if (activeColor === 'b') {
             absoluteMate = -rawMate;
@@ -237,17 +293,48 @@ class StockfishService {
         const from = uciMove.slice(0, 2);
         const to = uciMove.slice(2, 4);
         const promotion = uciMove.length > 4 ? uciMove[4] : undefined;
-        const res = tempChess.move({ from, to, promotion });
-        if (res) {
-          sanMovesList.push(res.san);
-        } else {
+        try {
+          const res = tempChess.move({ from, to, promotion });
+          if (res) {
+            sanMovesList.push(res.san);
+          } else {
+            break;
+          }
+        } catch (moveErr) {
           break;
         }
       }
 
+      if (rawPvMoves.length > 0 && sanMovesList.length === 0) {
+        // Move is illegal in current position, ignore outdated engine output
+        return;
+      }
+
       if (sanMovesList.length > 0) {
         bestMoveSan = sanMovesList[0];
-        sanLine = sanMovesList.join(' ');
+        
+        // Format continuation moves with move numbers like Lichess (e.g. 24... Qxh6 25. Nxe5 ...)
+        let moveNum = parseInt(this.currentFen.split(' ')[5], 10) || 1;
+        let isBlackTurn = this.currentFen.split(' ')[1] === 'b';
+        const formattedMoves = [];
+
+        for (let i = 0; i < sanMovesList.length; i++) {
+          const moveSan = sanMovesList[i];
+          if (i === 0 && isBlackTurn) {
+            formattedMoves.push(`${moveNum}... ${moveSan}`);
+            moveNum++;
+            isBlackTurn = false;
+          } else if (!isBlackTurn) {
+            formattedMoves.push(`${moveNum}. ${moveSan}`);
+            isBlackTurn = true;
+          } else {
+            formattedMoves.push(moveSan);
+            moveNum++;
+            isBlackTurn = false;
+          }
+        }
+
+        sanLine = formattedMoves.join(' ');
       }
     } catch (e) {
       sanLine = rawPvMoves.slice(0, 8).join(' ');
@@ -278,7 +365,7 @@ class StockfishService {
     this.variations.sort((a, b) => a.pvIndex - b.pvIndex);
 
     // Primary evaluation is pvIndex 1
-    const primary = this.variations[0] || varObj;
+    const primary = this.variations.find(v => v.pvIndex === 1) || this.variations[0] || varObj;
 
     if (this.callbacks.onEvaluation) {
       this.callbacks.onEvaluation({
@@ -298,12 +385,24 @@ class StockfishService {
    * Handles bestmove signal from Stockfish.
    */
   parseBestMove(line) {
+    if (this.stopTimeout) {
+      clearTimeout(this.stopTimeout);
+      this.stopTimeout = null;
+    }
+
     const parts = line.split(/\s+/);
     const bestMoveUci = parts[1];
-    this.isAnalyzing = false;
+    this.isSearching = false;
 
     if (this.callbacks.onBestMove) {
       this.callbacks.onBestMove(bestMoveUci);
+    }
+
+    // If another analysis was queued while this search was stopping, start it now
+    if (this.pendingAnalysis) {
+      const next = this.pendingAnalysis;
+      this.pendingAnalysis = null;
+      this.startSearch(next.fen, next.depth, next.multiPV);
     }
   }
 
@@ -324,6 +423,7 @@ class StockfishService {
       this.worker.terminate();
       this.worker = null;
       this.isReady = false;
+      this.initPromise = null;
     }
   }
 }

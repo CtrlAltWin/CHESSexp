@@ -5,7 +5,8 @@ import {
   undoMove, 
   redoMove, 
   resetBoard, 
-  flipBoard 
+  flipBoard,
+  restoreBoardState
 } from '../../store/slices/chessboardSlice';
 import { exitAnalyzingGame } from '../../store/slices/gamesSlice';
 import { 
@@ -29,7 +30,7 @@ export default function BoardControls({ onOpenFenPgnModal }) {
 
   const handleReturnToExplorer = () => {
     if (returnExplorerState) {
-      dispatch(jumpToMove(returnExplorerState.currentMoveIndex));
+      dispatch(restoreBoardState(returnExplorerState));
       dispatch(exitAnalyzingGame());
     } else {
       dispatch(exitAnalyzingGame());

@@ -45,6 +45,11 @@ export const engineSlice = createSlice({
       state.multiPV = action.payload;
       stockfishService.setMultiPV(action.payload);
     },
+    startPositionAnalysis: (state) => {
+      state.isAnalyzing = true;
+      state.depth = 0;
+      state.variations = [];
+    },
     updateEvaluation: (state, action) => {
       const {
         depth,
@@ -86,6 +91,7 @@ export const {
   setEngineEnabled,
   setMaxDepth,
   setMultiPV,
+  startPositionAnalysis,
   updateEvaluation,
   resetEngineState
 } = engineSlice.actions;

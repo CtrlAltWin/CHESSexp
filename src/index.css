@@ -4,25 +4,27 @@
 
 @layer base {
   :root {
-    --bg-primary-rgb: 241 245 249;
-    --bg-surface-rgb: 255 255 255;
-    --bg-card-rgb: 248 250 252;
-    --bg-hover-rgb: 226 232 240;
-    --border-primary-rgb: 226 232 240;
-    --brand-accent-rgb: 22 163 74;
-    --brand-accent-hover-rgb: 21 128 61;
-    --text-primary-rgb: 15 23 42;
+    /* Soothing warm linen / parchment palette for light mode - gentle on the eyes */
+    --bg-primary-rgb: 243 239 233;
+    --bg-surface-rgb: 253 251 247;
+    --bg-card-rgb: 247 244 237;
+    --bg-hover-rgb: 235 230 220;
+    --border-primary-rgb: 226 220 209;
+    --brand-accent-rgb: 34 160 74;
+    --brand-accent-hover-rgb: 27 138 62;
+    --text-primary-rgb: 38 36 33;
   }
 
   html.dark {
-    --bg-primary-rgb: 12 16 23;
-    --bg-surface-rgb: 20 27 36;
-    --bg-card-rgb: 26 34 48;
-    --bg-hover-rgb: 36 46 64;
-    --border-primary-rgb: 42 54 74;
+    /* Soothing warm dark charcoal / sepia palette for dark mode - gentle on the eyes (Lichess inspired) */
+    --bg-primary-rgb: 22 21 18;
+    --bg-surface-rgb: 32 30 26;
+    --bg-card-rgb: 40 37 32;
+    --bg-hover-rgb: 52 48 42;
+    --border-primary-rgb: 60 56 49;
     --brand-accent-rgb: 72 199 116;
     --brand-accent-hover-rgb: 62 179 103;
-    --text-primary-rgb: 241 245 249;
+    --text-primary-rgb: 238 235 230;
   }
 
   body {
@@ -34,8 +36,8 @@
 }
 
 /* ========================================================
-   DEFINITIVE LIGHT MODE STYLES (When NOT .dark)
-   Guarantees 100% proper contrast, backgrounds, and borders
+   WARM LIGHT MODE STYLES (When NOT .dark)
+   Guarantees warm eye-friendly contrast, backgrounds, and borders
 ======================================================== */
 html:not(.dark) {
   color-scheme: light;
@@ -49,43 +51,43 @@ html.dark {
 html:not(.dark) body,
 html:not(.dark) #root,
 html:not(.dark) .bg-brand-bg {
-  background-color: #f1f5f9 !important;
-  color: #0f172a !important;
+  background-color: #f3efe9 !important;
+  color: #262421 !important;
 }
 
 /* Surfaces and Panels */
 html:not(.dark) .bg-brand-surface {
-  background-color: #ffffff !important;
-  color: #0f172a !important;
-  border-color: #e2e8f0 !important;
+  background-color: #fdfbf7 !important;
+  color: #262421 !important;
+  border-color: #e2dcd1 !important;
 }
 
 /* Cards and Sub-panels */
 html:not(.dark) .bg-brand-card {
-  background-color: #f8fafc !important;
-  color: #0f172a !important;
-  border-color: #e2e8f0 !important;
+  background-color: #f7f4ed !important;
+  color: #262421 !important;
+  border-color: #e2dcd1 !important;
 }
 
 html:not(.dark) .bg-brand-card\/50,
 html:not(.dark) .bg-brand-card\/40,
 html:not(.dark) .bg-brand-card\/30 {
-  background-color: #f8fafc !important;
+  background-color: #f7f4ed !important;
 }
 
 html:not(.dark) .bg-brand-surface\/60 {
-  background-color: #f8fafc !important;
+  background-color: #f7f4ed !important;
 }
 
 /* Hovers */
 html:not(.dark) .bg-brand-hover,
 html:not(.dark) .hover\:bg-brand-hover:hover {
-  background-color: #e2e8f0 !important;
+  background-color: #ebe6dc !important;
 }
 
 html:not(.dark) .hover\:bg-brand-hover\/70:hover,
 html:not(.dark) .hover\:bg-brand-hover\/90:hover {
-  background-color: #f1f5f9 !important;
+  background-color: #f3efe9 !important;
 }
 
 /* Borders */
@@ -93,55 +95,55 @@ html:not(.dark) .border-brand-border,
 html:not(.dark) .border-brand-border\/60,
 html:not(.dark) .border-brand-border\/40,
 html:not(.dark) .divide-brand-border\/40 > * + * {
-  border-color: #e2e8f0 !important;
+  border-color: #e2dcd1 !important;
 }
 
 /* Primary Text */
 html:not(.dark) .text-slate-100,
 html:not(.dark) .text-slate-200 {
-  color: #0f172a !important;
+  color: #262421 !important;
 }
 
 /* Secondary & Muted Text */
 html:not(.dark) .text-slate-300 {
-  color: #1e293b !important;
+  color: #3d3933 !important;
 }
 
 html:not(.dark) .text-slate-400 {
-  color: #475569 !important;
+  color: #635c52 !important;
 }
 
 html:not(.dark) .text-slate-500 {
-  color: #64748b !important;
+  color: #827b70 !important;
 }
 
 /* Slate utility backgrounds */
 html:not(.dark) .bg-slate-900 {
-  background-color: #e2e8f0 !important;
-  color: #0f172a !important;
+  background-color: #e8e3d8 !important;
+  color: #262421 !important;
 }
 
 html:not(.dark) .bg-slate-800 {
-  background-color: #cbd5e1 !important;
+  background-color: #ded8cb !important;
 }
 
 /* Inputs, Textareas, and Selects in Light Mode */
 html:not(.dark) input,
 html:not(.dark) textarea,
 html:not(.dark) select {
-  background-color: #ffffff !important;
-  color: #0f172a !important;
-  border-color: #cbd5e1 !important;
+  background-color: #fdfbf7 !important;
+  color: #262421 !important;
+  border-color: #d6cfc2 !important;
 }
 
 html:not(.dark) input::placeholder,
 html:not(.dark) textarea::placeholder {
-  color: #94a3b8 !important;
+  color: #9c9486 !important;
 }
 
 /* Active tab text in light mode */
 html:not(.dark) .bg-brand-accent {
-  background-color: #16a34a !important;
+  background-color: #22a04a !important;
   color: #ffffff !important;
 }
 
@@ -151,11 +153,11 @@ html:not(.dark) .bg-brand-accent * {
 
 /* Scrollbars */
 html:not(.dark) ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #ded7c9;
 }
 
 html:not(.dark) ::-webkit-scrollbar-thumb:hover {
-  background: #16a34a;
+  background: #22a04a;
 }
 
 ::-webkit-scrollbar {

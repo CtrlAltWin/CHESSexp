@@ -6,6 +6,7 @@ import gamesReducer from './slices/gamesSlice';
 import engineReducer from './slices/engineSlice';
 import importReducer from './slices/importSlice';
 import settingsReducer from './slices/settingsSlice';
+import { getPersistedPreloadedState, subscribePersistence } from '../services/storage/persistenceService';
 
 export const store = configureStore({
   reducer: {
@@ -17,8 +18,12 @@ export const store = configureStore({
     import: importReducer,
     settings: settingsReducer
   },
+  preloadedState: getPersistedPreloadedState(),
   devTools: process.env.NODE_ENV !== 'production'
 });
+
+// Subscribe to automatically debounce and save relevant state changes to localStorage
+subscribePersistence(store);
 
 export default store;
 

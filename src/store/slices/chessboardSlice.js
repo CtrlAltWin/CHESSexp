@@ -78,17 +78,24 @@ export const chessboardSlice = createSlice({
           const newFen = chess.fen();
           const newNormFen = normalizeFen(newFen);
           
+          const isCheckmate = chess.isCheckmate();
+          const isDraw = chess.isDraw();
+          const isCheck = chess.inCheck();
+          const isCastle = Boolean(moveRes.san.includes('O-O') || moveRes.flags?.includes('k') || moveRes.flags?.includes('q'));
+          const isPromote = Boolean(moveRes.promotion || moveRes.san.includes('='));
+          const isCapture = Boolean(moveRes.captured || moveRes.san.includes('x'));
+
           // Sound effects exactly matching chess.com
-          if (chess.isCheckmate() || chess.isDraw()) {
+          if (isCheckmate || isDraw) {
             soundService.playGameEnd();
-          } else if (chess.inCheck()) {
+          } else if (isCheck) {
             soundService.playCheck();
-          } else if (moveRes.promotion) {
-            soundService.playPromote();
-          } else if (moveRes.captured) {
+          } else if (isCapture) {
             soundService.playCapture();
-          } else if (moveRes.san.includes('O-O')) {
+          } else if (isCastle) {
             soundService.playCastle();
+          } else if (isPromote) {
+            soundService.playPromote();
           } else {
             soundService.playMove();
           }
@@ -99,6 +106,12 @@ export const chessboardSlice = createSlice({
             san: moveRes.san,
             from: moveRes.from,
             to: moveRes.to,
+            captured: isCapture,
+            promotion: isPromote,
+            isCastle,
+            isCheck,
+            isCheckmate,
+            isDraw,
             fen: newFen,
             normFen: newNormFen,
             moveNumber: Math.floor(newHistory.length / 2) + 1,
@@ -113,9 +126,9 @@ export const chessboardSlice = createSlice({
           state.selectedSquare = null;
           state.legalMoves = [];
           state.turn = chess.turn();
-          state.isCheck = chess.inCheck();
-          state.isCheckmate = chess.isCheckmate();
-          state.isDraw = chess.isDraw();
+          state.isCheck = isCheck;
+          state.isCheckmate = isCheckmate;
+          state.isDraw = isDraw;
           state.promotionPending = null;
         }
       } catch (e) {
@@ -125,8 +138,16 @@ export const chessboardSlice = createSlice({
     },
 
     jumpToMove: (state, action) => {
-      const targetIndex = action.payload; // -1 for start, 0..N-1
+      const prevIndex = state.currentMoveIndex;
+      const targetIndex = typeof action.payload === 'object' && action.payload !== null
+        ? action.payload.targetIndex
+        : action.payload;
+      const silent = typeof action.payload === 'object' && action.payload !== null
+        ? Boolean(action.payload.silent)
+        : false;
+
       if (targetIndex < -1 || targetIndex >= state.history.length) return;
+      if (targetIndex === prevIndex) return;
 
       if (targetIndex === -1) {
         state.fen = STARTING_FEN;
@@ -153,7 +174,32 @@ export const chessboardSlice = createSlice({
       state.selectedSquare = null;
       state.legalMoves = [];
       state.promotionPending = null;
-      soundService.playMove();
+
+      // Play appropriate tactical sounds when navigating
+      if (!silent) {
+        if (targetIndex > prevIndex) {
+          // Navigating forward: play sound matching the specific move stepped into
+          const moveItem = state.history[targetIndex];
+          if (moveItem) {
+            if (moveItem.isCheckmate || moveItem.isDraw) {
+              soundService.playGameEnd();
+            } else if (moveItem.isCheck || moveItem.san?.includes('+') || moveItem.san?.includes('#')) {
+              soundService.playCheck();
+            } else if (moveItem.captured || moveItem.san?.includes('x')) {
+              soundService.playCapture();
+            } else if (moveItem.isCastle || moveItem.san?.includes('O-O')) {
+              soundService.playCastle();
+            } else if (moveItem.promotion || moveItem.san?.includes('=')) {
+              soundService.playPromote();
+            } else {
+              soundService.playMove();
+            }
+          }
+        } else if (targetIndex < prevIndex) {
+          // Navigating backward: soft move sound
+          soundService.playMove();
+        }
+      }
     },
 
     undoMove: (state) => {
@@ -229,6 +275,12 @@ export const chessboardSlice = createSlice({
             san: m.san,
             from: m.from,
             to: m.to,
+            captured: Boolean(m.captured || m.san?.includes('x')),
+            promotion: Boolean(m.promotion || m.san?.includes('=')),
+            isCastle: Boolean(m.san?.includes('O-O') || m.flags?.includes('k') || m.flags?.includes('q')),
+            isCheck: replay.inCheck(),
+            isCheckmate: replay.isCheckmate(),
+            isDraw: replay.isDraw(),
             fen: currentFen,
             normFen: normalizeFen(currentFen),
             moveNumber: Math.floor(reconstructedHistory.length / 2) + 1,
@@ -241,10 +293,28 @@ export const chessboardSlice = createSlice({
           ? targetMoveIndex 
           : reconstructedHistory.length - 1;
 
-        chessboardSlice.caseReducers.jumpToMove(state, { payload: targetIdx });
+        // Load historical game silently without initial navigation noise
+        chessboardSlice.caseReducers.jumpToMove(state, { 
+          payload: { targetIndex: targetIdx, silent: true } 
+        });
       } catch (e) {
         console.error('Failed to load PGN:', e);
       }
+    },
+
+    restoreBoardState: (state, action) => {
+      const { fen, normFen, history, currentMoveIndex } = action.payload || {};
+      state.fen = fen || STARTING_FEN;
+      state.normFen = normFen || STARTING_NORM_FEN;
+      state.history = history || [];
+      state.currentMoveIndex = currentMoveIndex !== undefined ? currentMoveIndex : -1;
+      state.lastMove = state.currentMoveIndex >= 0 && state.history[state.currentMoveIndex]
+        ? { from: state.history[state.currentMoveIndex].from, to: state.history[state.currentMoveIndex].to }
+        : null;
+      state.selectedSquare = null;
+      state.legalMoves = [];
+      state.promotionPending = null;
+      // Silent: no sound played during position restoration
     }
   }
 });
@@ -260,7 +330,8 @@ export const {
   flipBoard,
   setOrientation,
   loadFenPosition,
-  loadPgnGame
+  loadPgnGame,
+  restoreBoardState
 } = chessboardSlice.actions;
 
 export default chessboardSlice.reducer;

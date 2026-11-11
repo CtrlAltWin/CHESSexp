@@ -17,23 +17,24 @@ import BishopLogo from './components/brand/BishopLogo';
 import { loadProfilesAsync, setSelectedProfile, removeProfileAsync } from './store/slices/opponentSlice';
 import { loadSampleDatasetAsync, openImportModal } from './store/slices/importSlice';
 import { fetchPositionStatsAsync } from './store/slices/explorerSlice';
-import { updateEvaluation } from './store/slices/engineSlice';
-import { 
-  undoMove, 
-  redoMove, 
-  jumpToMove, 
-  flipBoard 
+import { updateEvaluation, startPositionAnalysis } from './store/slices/engineSlice';
+import {
+  undoMove,
+  redoMove,
+  jumpToMove,
+  flipBoard
 } from './store/slices/chessboardSlice';
 import { stockfishService } from './services/engine/stockfishService';
+import { getPersistedTabs, savePersistedTabs } from './services/storage/persistenceService';
 
-import { 
-  Database, 
-  Cpu, 
-  History, 
-  BarChart2, 
-  Layers, 
-  DownloadCloud, 
-  Settings, 
+import {
+  Database,
+  Cpu,
+  History,
+  BarChart2,
+  Layers,
+  DownloadCloud,
+  Settings,
   BookOpen,
   ChevronRight,
   Shield,
@@ -46,32 +47,48 @@ export default function App() {
   const dispatch = useDispatch();
 
   // Redux state
-  const { fen, normFen, orientation, history } = useSelector((state) => state.chessboard);
+  const { fen, normFen, orientation, history, currentMoveIndex } = useSelector((state) => state.chessboard);
   const { selectedProfile, profiles } = useSelector((state) => state.opponent);
   const { mode: explorerMode } = useSelector((state) => state.explorer);
   const { isEnabled: engineEnabled, maxDepth, multiPV } = useSelector((state) => state.engine);
   const { isAnalyzingGame, selectedGame } = useSelector((state) => state.games);
 
-  // App view state
-  const [activeView, setActiveView] = useState('analysis'); // 'analysis' | 'dashboard'
-  const [mobileTab, setMobileTab] = useState('explorer'); // 'explorer' | 'engine' | 'games'
-  const [desktopRightTab, setDesktopRightTab] = useState('explorer'); // 'explorer' | 'engine' | 'games'
-  
+  // App view and tab state with persistence across refreshes
+  const initialTabs = useRef(getPersistedTabs()).current;
+  const [activeView, setActiveView] = useState(initialTabs.activeView);
+  const [desktopRightTab, setDesktopRightTab] = useState(initialTabs.desktopRightTab);
+  const [mobileTab, setMobileTab] = useState(initialTabs.mobileTab);
+
+  // Automatically persist selected tabs when they change
+  useEffect(() => {
+    savePersistedTabs({ activeView, desktopRightTab, mobileTab });
+  }, [activeView, desktopRightTab, mobileTab]);
+
   // Modals
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [fenPgnOpen, setFenPgnOpen] = useState(false);
 
-  // Board width calculation
+  // Board width calculation with responsive initial state
   const boardContainerRef = useRef(null);
-  const [boardWidth, setBoardWidth] = useState(480);
+  const [boardWidth, setBoardWidth] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const availableW = window.innerWidth - 24;
+      const availableH = window.innerHeight - 250;
+      return Math.max(260, Math.min(availableW, availableH, 560));
+    }
+    return 460;
+  });
 
   // Measure board container width dynamically to keep 1:1 aspect ratio without clipping
   useEffect(() => {
     function handleResize() {
       if (boardContainerRef.current) {
-        const availableWidth = boardContainerRef.current.clientWidth - 8;
-        const availableHeight = window.innerHeight - 260; // leave room for header & controls
-        const optimalSize = Math.max(280, Math.min(availableWidth, availableHeight, 560));
+        // Enforce viewport width limit to break any container flex stretch feedback
+        const maxViewportW = window.innerWidth - 24;
+        const containerW = boardContainerRef.current.clientWidth - 8;
+        const availableWidth = Math.min(containerW > 0 ? containerW : maxViewportW, maxViewportW);
+        const availableHeight = window.innerHeight - 250; // leave room for header & controls
+        const optimalSize = Math.max(260, Math.min(availableWidth, availableHeight, 560));
         setBoardWidth(optimalSize);
       }
     }
@@ -89,7 +106,9 @@ export default function App() {
   // Whenever board position changes or profile changes, fetch Opening Explorer statistics
   useEffect(() => {
     if (selectedProfile && normFen) {
-      const lineMoves = history.map(h => h.san);
+      const lineMoves = currentMoveIndex >= 0
+        ? history.slice(0, currentMoveIndex + 1).map(h => h.san)
+        : [];
       dispatch(fetchPositionStatsAsync({
         profileUsername: selectedProfile,
         normFen,
@@ -97,7 +116,7 @@ export default function App() {
         mode: explorerMode
       }));
     }
-  }, [normFen, selectedProfile, explorerMode, history, dispatch]);
+  }, [normFen, selectedProfile, explorerMode, history, currentMoveIndex, dispatch]);
 
   // Stockfish 19 Engine lifecycle
   useEffect(() => {
@@ -109,6 +128,7 @@ export default function App() {
     });
 
     if (engineEnabled && fen) {
+      dispatch(startPositionAnalysis());
       stockfishService.analyze(fen, { depth: maxDepth, multiPV });
     } else {
       stockfishService.stop();
@@ -155,9 +175,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-brand-bg flex flex-col overflow-x-hidden">
-      
+
       {/* Brand Header */}
-      <BrandHeader 
+      <BrandHeader
         activeView={activeView}
         setActiveView={setActiveView}
         onOpenSettings={() => setSettingsOpen(true)}
@@ -165,13 +185,13 @@ export default function App() {
       />
 
       {/* Main Workspace */}
-      <main className="flex-1 flex flex-col">
+      <main className="flex-1 flex flex-col pb-24 md:pb-4">
         {activeView === 'dashboard' ? (
           <RepertoireDashboard onAnalyzeOpening={() => setActiveView('analysis')} />
         ) : (
           /* Analysis Workspace (Responsive 3-Column on Desktop, Progressive Mobile on small screens) */
           <div className="flex-1 max-w-[1720px] w-full mx-auto p-2 sm:p-4 grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
-            
+
             {/* Desktop Left Column: Profiles & Fast Navigation (hidden on mobile, visible >= 1280px or 1024px) */}
             <aside className="hidden xl:flex xl:col-span-2 flex-col gap-3">
               {/* User Repertoire Overview Card */}
@@ -241,11 +261,10 @@ export default function App() {
                         <div
                           key={p.username}
                           onClick={() => dispatch(setSelectedProfile(p.username))}
-                          className={`w-full px-2.5 py-2 rounded-lg text-left text-xs flex items-center justify-between transition-smooth cursor-pointer group ${
-                            isSelected
-                              ? 'bg-brand-accent/20 border border-brand-accent text-brand-accent font-bold'
-                              : 'hover:bg-brand-hover text-slate-300'
-                          }`}
+                          className={`w-full px-2.5 py-2 rounded-lg text-left text-xs flex items-center justify-between transition-smooth cursor-pointer group ${isSelected
+                            ? 'bg-brand-accent/20 border border-brand-accent text-brand-accent font-bold'
+                            : 'hover:bg-brand-hover text-slate-300'
+                            }`}
                         >
                           <div className="flex items-center gap-2 truncate mr-1">
                             <span className="truncate">{p.displayName || p.username}</span>
@@ -284,14 +303,14 @@ export default function App() {
 
             {/* Center Column: Chessboard, Eval Bar & Board Controls */}
             <div className="lg:col-span-7 xl:col-span-5 flex flex-col gap-2 sm:gap-3 items-center">
-              
+
               {/* Mobile Evaluation Bar (horizontal on small screens) */}
               <div className="w-full lg:hidden">
                 <EvalBar orientation={orientation} isMobile={true} />
               </div>
 
               {/* Board and Vertical Eval Bar Container */}
-              <div 
+              <div
                 ref={boardContainerRef}
                 className="w-full flex items-center justify-center gap-2 sm:gap-3"
               >
@@ -316,40 +335,37 @@ export default function App() {
 
             {/* Right Column: Opening Explorer / Engine / Historical Games (Desktop tabs or side-by-side) */}
             <div className="lg:col-span-5 xl:col-span-5 flex flex-col gap-3 h-full min-h-[460px]">
-              
-              {/* Desktop Tab Selector */}
-              <div className="flex items-center gap-1 p-1 bg-brand-surface border border-brand-border rounded-xl">
+
+              {/* Desktop Tab Selector (Hidden on mobile <768px, visible on desktop >=768px) */}
+              <div className="hidden md:flex items-center gap-1 p-1 bg-brand-surface border border-brand-border rounded-xl">
                 <button
-                  onClick={() => setDesktopRightTab('explorer')}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold transition-smooth ${
-                    desktopRightTab === 'explorer'
-                      ? 'bg-brand-accent text-slate-950 font-bold shadow-xs'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
+                  onClick={() => { setDesktopRightTab('explorer'); setMobileTab('explorer'); }}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold transition-smooth ${desktopRightTab === 'explorer'
+                    ? 'bg-brand-accent text-slate-950 font-bold shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                    }`}
                 >
                   <Database className="w-3.5 h-3.5" />
                   <span>Opening Explorer</span>
                 </button>
 
                 <button
-                  onClick={() => setDesktopRightTab('engine')}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold transition-smooth ${
-                    desktopRightTab === 'engine'
-                      ? 'bg-brand-accent text-slate-950 font-bold shadow-xs'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
+                  onClick={() => { setDesktopRightTab('engine'); setMobileTab('engine'); }}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold transition-smooth ${desktopRightTab === 'engine'
+                    ? 'bg-brand-accent text-slate-950 font-bold shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                    }`}
                 >
                   <Cpu className="w-3.5 h-3.5" />
                   <span>Stockfish 19</span>
                 </button>
 
                 <button
-                  onClick={() => setDesktopRightTab('games')}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold transition-smooth ${
-                    desktopRightTab === 'games'
-                      ? 'bg-brand-accent text-slate-950 font-bold shadow-xs'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
+                  onClick={() => { setDesktopRightTab('games'); setMobileTab('games'); }}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold transition-smooth ${desktopRightTab === 'games'
+                    ? 'bg-brand-accent text-slate-950 font-bold shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                    }`}
                 >
                   <History className="w-3.5 h-3.5" />
                   <span>Matching Games</span>
@@ -369,55 +385,102 @@ export default function App() {
         )}
       </main>
 
-      {/* Mobile Sticky Bottom Navigation (Touch-Friendly, min 44px) */}
-      <nav className="sm:hidden sticky bottom-0 z-40 bg-brand-surface border-t border-brand-border px-2 py-1 flex items-center justify-around select-none">
-        <button
-          onClick={() => { setActiveView('analysis'); setDesktopRightTab('explorer'); }}
-          className={`flex flex-col items-center justify-center py-1.5 px-3 rounded-lg touch-target ${
-            activeView === 'analysis' && desktopRightTab === 'explorer'
-              ? 'text-brand-accent font-bold'
-              : 'text-slate-400'
-          }`}
-        >
-          <Database className="w-4 h-4" />
-          <span className="text-[10px] mt-0.5">Explorer</span>
-        </button>
+      {/* Mobile Fixed Bottom Navigation Bar (Screens below 768px, Persistent & Fixed) */}
+      <nav
+        aria-label="Mobile Navigation"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-brand-surface/95 backdrop-blur-md border-t border-brand-border shadow-[0_-4px_20px_rgba(0,0,0,0.18)] select-none"
+        style={{
+          paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom, 0px))',
+          paddingTop: '0.35rem'
+        }}
+      >
+        <div className="max-w-md mx-auto grid grid-cols-4 gap-1 px-2">
+          {/* Explorer */}
+          <button
+            onClick={() => {
+              setActiveView('analysis');
+              setDesktopRightTab('explorer');
+              setMobileTab('explorer');
+            }}
+            className={`relative flex flex-col items-center justify-center py-1.5 px-1 rounded-xl transition-all duration-200 touch-target ${
+              activeView === 'analysis' && desktopRightTab === 'explorer'
+                ? 'text-brand-accent font-bold bg-brand-accent/15 shadow-xs'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-brand-hover/40'
+            }`}
+            aria-current={activeView === 'analysis' && desktopRightTab === 'explorer' ? 'page' : undefined}
+          >
+            <Database className={`w-5 h-5 transition-transform duration-200 ${
+              activeView === 'analysis' && desktopRightTab === 'explorer' ? 'scale-110 text-brand-accent' : ''
+            }`} />
+            <span className="text-[11px] mt-1 tracking-tight leading-none font-medium">
+              Explorer
+            </span>
+          </button>
 
-        <button
-          onClick={() => { setActiveView('analysis'); setDesktopRightTab('engine'); }}
-          className={`flex flex-col items-center justify-center py-1.5 px-3 rounded-lg touch-target ${
-            activeView === 'analysis' && desktopRightTab === 'engine'
-              ? 'text-brand-accent font-bold'
-              : 'text-slate-400'
-          }`}
-        >
-          <Cpu className="w-4 h-4" />
-          <span className="text-[10px] mt-0.5">Engine</span>
-        </button>
+          {/* Engine */}
+          <button
+            onClick={() => {
+              setActiveView('analysis');
+              setDesktopRightTab('engine');
+              setMobileTab('engine');
+            }}
+            className={`relative flex flex-col items-center justify-center py-1.5 px-1 rounded-xl transition-all duration-200 touch-target ${
+              activeView === 'analysis' && desktopRightTab === 'engine'
+                ? 'text-brand-accent font-bold bg-brand-accent/15 shadow-xs'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-brand-hover/40'
+            }`}
+            aria-current={activeView === 'analysis' && desktopRightTab === 'engine' ? 'page' : undefined}
+          >
+            <Cpu className={`w-5 h-5 transition-transform duration-200 ${
+              activeView === 'analysis' && desktopRightTab === 'engine' ? 'scale-110 text-brand-accent' : ''
+            }`} />
+            <span className="text-[11px] mt-1 tracking-tight leading-none font-medium">
+              Engine
+            </span>
+          </button>
 
-        <button
-          onClick={() => { setActiveView('analysis'); setDesktopRightTab('games'); }}
-          className={`flex flex-col items-center justify-center py-1.5 px-3 rounded-lg touch-target ${
-            activeView === 'analysis' && desktopRightTab === 'games'
-              ? 'text-brand-accent font-bold'
-              : 'text-slate-400'
-          }`}
-        >
-          <History className="w-4 h-4" />
-          <span className="text-[10px] mt-0.5">Games</span>
-        </button>
+          {/* Games */}
+          <button
+            onClick={() => {
+              setActiveView('analysis');
+              setDesktopRightTab('games');
+              setMobileTab('games');
+            }}
+            className={`relative flex flex-col items-center justify-center py-1.5 px-1 rounded-xl transition-all duration-200 touch-target ${
+              activeView === 'analysis' && desktopRightTab === 'games'
+                ? 'text-brand-accent font-bold bg-brand-accent/15 shadow-xs'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-brand-hover/40'
+            }`}
+            aria-current={activeView === 'analysis' && desktopRightTab === 'games' ? 'page' : undefined}
+          >
+            <History className={`w-5 h-5 transition-transform duration-200 ${
+              activeView === 'analysis' && desktopRightTab === 'games' ? 'scale-110 text-brand-accent' : ''
+            }`} />
+            <span className="text-[11px] mt-1 tracking-tight leading-none font-medium">
+              Games
+            </span>
+          </button>
 
-        <button
-          onClick={() => setActiveView(activeView === 'dashboard' ? 'analysis' : 'dashboard')}
-          className={`flex flex-col items-center justify-center py-1.5 px-3 rounded-lg touch-target ${
-            activeView === 'dashboard'
-              ? 'text-brand-accent font-bold'
-              : 'text-slate-400'
-          }`}
-        >
-          <BarChart2 className="w-4 h-4" />
-          <span className="text-[10px] mt-0.5">Dashboard</span>
-        </button>
+          {/* Dashboard */}
+          <button
+            onClick={() => {
+              setActiveView('dashboard');
+            }}
+            className={`relative flex flex-col items-center justify-center py-1.5 px-1 rounded-xl transition-all duration-200 touch-target ${
+              activeView === 'dashboard'
+                ? 'text-brand-accent font-bold bg-brand-accent/15 shadow-xs'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-brand-hover/40'
+            }`}
+            aria-current={activeView === 'dashboard' ? 'page' : undefined}
+          >
+            <BarChart2 className={`w-5 h-5 transition-transform duration-200 ${
+              activeView === 'dashboard' ? 'scale-110 text-brand-accent' : ''
+            }`} />
+            <span className="text-[11px] mt-1 tracking-tight leading-none font-medium">
+              Dashboard
+            </span>
+          </button>
+        </div>
       </nav>
 
       {/* Modals */}
