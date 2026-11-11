@@ -13,22 +13,22 @@ const BOARD_THEMES = {
   green: {
     light: '#eeeed2',
     dark: '#769656',
-    name: 'New Green'
+    name: 'Classic Green'
   },
   blue: {
     light: '#e1e7ed',
     dark: '#68889e',
-    name: 'Blue'
+    name: 'Ocean Blue'
   },
   wood: {
     light: '#f0d9b5',
     dark: '#b58863',
-    name: 'Wood'
+    name: 'Classic Wood'
   },
   slate: {
     light: '#e2e8f0',
     dark: '#475569',
-    name: 'Slate'
+    name: 'Modern Slate'
   }
 };
 

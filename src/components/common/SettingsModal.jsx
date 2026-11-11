@@ -17,10 +17,10 @@ export default function SettingsModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   const boardThemes = [
-    { id: 'green', name: 'New Green', light: '#eeeed2', dark: '#769656' },
-    { id: 'blue', name: 'Blue', light: '#e1e7ed', dark: '#68889e' },
-    { id: 'wood', name: 'Wood', light: '#f0d9b5', dark: '#b58863' },
-    { id: 'slate', name: 'Slate', light: '#e2e8f0', dark: '#475569' }
+    { id: 'green', name: 'Classic Green', light: '#eeeed2', dark: '#769656' },
+    { id: 'blue', name: 'Ocean Blue', light: '#e1e7ed', dark: '#68889e' },
+    { id: 'wood', name: 'Classic Wood', light: '#f0d9b5', dark: '#b58863' },
+    { id: 'slate', name: 'Modern Slate', light: '#e2e8f0', dark: '#475569' }
   ];
 
   return (
