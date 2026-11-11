@@ -55,6 +55,29 @@ export default function OpeningExplorer() {
     moves = []
   } = positionStats || {};
 
+  if (!selectedProfile) {
+    return (
+      <div className="flex flex-col h-full bg-brand-surface border border-brand-border rounded-xl overflow-hidden select-none p-6 items-center justify-center text-center">
+        <div className="w-14 h-14 rounded-2xl bg-brand-card flex items-center justify-center text-brand-accent border border-brand-border mb-3 shadow-xs">
+          <Database className="w-7 h-7" />
+        </div>
+        <h3 className="text-base font-bold text-slate-100 mb-1">
+          Welcome to CHESSexp
+        </h3>
+        <p className="text-xs text-slate-400 max-w-sm mb-4 leading-relaxed">
+          No account connected yet. Import your Chess.com games to explore your personal openings, track move frequencies, and prepare responses with Stockfish 19.
+        </p>
+        <button
+          onClick={() => dispatch(openImportModal())}
+          className="px-4 py-2.5 rounded-xl bg-brand-accent hover:bg-brand-accentHover text-slate-950 font-bold text-xs transition-smooth shadow-xs flex items-center gap-2"
+        >
+          <DownloadCloud className="w-4 h-4" />
+          <span>Import My Games</span>
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-brand-surface border border-brand-border rounded-xl overflow-hidden select-none">
       

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { getProfileDashboardData } from '../../services/storage/dbOperations';
-import { setSelectedProfile } from '../../store/slices/opponentSlice';
+import { setSelectedProfile, removeProfileAsync } from '../../store/slices/opponentSlice';
 import { openImportModal } from '../../store/slices/importSlice';
 import { 
   BarChart2, 
@@ -14,7 +14,9 @@ import {
   DownloadCloud, 
   Calendar,
   Users,
-  ChevronRight
+  ChevronRight,
+  Trash2,
+  UserPlus
 } from 'lucide-react';
 
 export default function RepertoireDashboard({ onAnalyzeOpening }) {
@@ -25,6 +27,11 @@ export default function RepertoireDashboard({ onAnalyzeOpening }) {
 
   useEffect(() => {
     async function loadData() {
+      if (!selectedProfile) {
+        setData(null);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
         const res = await getProfileDashboardData(selectedProfile);
@@ -37,6 +44,29 @@ export default function RepertoireDashboard({ onAnalyzeOpening }) {
     }
     loadData();
   }, [selectedProfile]);
+
+  if (!selectedProfile) {
+    return (
+      <div className="max-w-xl mx-auto p-8 my-12 bg-brand-surface border border-brand-border rounded-2xl text-center flex flex-col items-center gap-4 animate-in fade-in">
+        <div className="w-16 h-16 rounded-2xl bg-brand-card flex items-center justify-center text-brand-accent border border-brand-border shadow-xs">
+          <BarChart2 className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-extrabold text-slate-100">
+          Personal Repertoire Lab
+        </h2>
+        <p className="text-xs sm:text-sm text-slate-400 max-w-md leading-relaxed">
+          Connect your Chess.com account to generate personalized analytics on your opening frequency, White/Black win rates, strongest lines, and repertoire weaknesses to prepare with Stockfish 19.
+        </p>
+        <button
+          onClick={() => dispatch(openImportModal())}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand-accent hover:bg-brand-accentHover text-slate-950 text-xs font-bold transition-smooth shadow-xs"
+        >
+          <DownloadCloud className="w-4 h-4" />
+          <span>Import My Games</span>
+        </button>
+      </div>
+    );
+  }
 
   const activeProfile = profiles.find(p => p.username === selectedProfile) || {
     displayName: selectedProfile,
@@ -73,11 +103,24 @@ export default function RepertoireDashboard({ onAnalyzeOpening }) {
 
         <div className="flex items-center gap-2">
           <button
+            onClick={() => {
+              if (window.confirm(`Delete account "${profile.displayName || profile.username}" and all its imported games?`)) {
+                dispatch(removeProfileAsync(profile.username));
+              }
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-brand-card hover:bg-rose-500/15 border border-brand-border hover:border-rose-500/30 text-slate-300 hover:text-rose-400 text-xs font-semibold transition-smooth"
+            title="Delete this account"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Delete Account</span>
+          </button>
+
+          <button
             onClick={() => dispatch(openImportModal())}
             className="flex items-center gap-2 px-3 py-2 rounded-xl bg-brand-accent hover:bg-brand-accentHover text-slate-950 text-xs font-bold transition-smooth shadow-sm"
           >
             <DownloadCloud className="w-4 h-4" />
-            <span>Import Games</span>
+            <span>Import My Games</span>
           </button>
         </div>
       </div>

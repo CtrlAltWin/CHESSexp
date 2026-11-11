@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import BishopLogo from './BishopLogo';
-import { setSelectedProfile } from '../../store/slices/opponentSlice';
+import { setSelectedProfile, removeProfileAsync } from '../../store/slices/opponentSlice';
 import { openImportModal } from '../../store/slices/importSlice';
 import { setTheme, toggleSound } from '../../store/slices/settingsSlice';
 import { fetchPositionStatsAsync } from '../../store/slices/explorerSlice';
@@ -16,7 +16,9 @@ import {
   Settings, 
   ChevronDown,
   Layers,
-  ArrowLeft
+  ArrowLeft,
+  Trash2,
+  UserPlus
 } from 'lucide-react';
 
 export default function BrandHeader({ 
@@ -70,14 +72,14 @@ export default function BrandHeader({
         <div className="relative">
           <button
             onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-brand-card hover:bg-brand-hover border border-brand-border text-xs sm:text-sm font-medium transition-smooth max-w-[190px] sm:max-w-[260px]"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-brand-card hover:bg-brand-hover border border-brand-border text-xs sm:text-sm font-medium transition-smooth max-w-[200px] sm:max-w-[270px]"
             title="Switch Player Repertoire"
           >
             <Users className="w-3.5 h-3.5 text-brand-accent flex-shrink-0" />
             <div className="flex flex-col text-left truncate">
               <span className="text-[10px] text-slate-400 leading-tight">My Repertoire</span>
               <span className="truncate text-slate-200 font-semibold leading-tight">
-                {activeProfObj.displayName || activeProfObj.username}
+                {selectedProfile ? (activeProfObj?.displayName || activeProfObj?.username) : 'Connect Account'}
               </span>
             </div>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-auto flex-shrink-0" />
@@ -86,28 +88,30 @@ export default function BrandHeader({
           {/* Profile Dropdown Menu */}
           {dropdownOpen && (
             <div 
-              className="absolute left-0 sm:right-0 sm:left-auto mt-1 w-64 bg-brand-card border border-brand-border rounded-xl shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100"
+              className="absolute left-0 sm:right-0 sm:left-auto mt-1 w-72 bg-brand-card border border-brand-border rounded-xl shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100"
               onMouseLeave={() => setDropdownOpen(false)}
             >
               <div className="px-3 py-1.5 border-b border-brand-border/60 text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex justify-between items-center">
                 <span>Player Accounts</span>
-                <span className="text-brand-accent">{profiles.length} profiles</span>
+                <span className="text-brand-accent">{profiles.length} connected</span>
               </div>
               
               <div className="max-h-60 overflow-y-auto py-1">
                 {profiles.map((p) => {
                   const isSelected = p.username === selectedProfile;
                   return (
-                    <button
+                    <div
                       key={p.username}
-                      onClick={() => handleSelectProfile(p.username)}
-                      className={`w-full px-3 py-2 text-left flex items-center justify-between text-xs transition-smooth ${
+                      className={`w-full px-3 py-2 text-left flex items-center justify-between text-xs transition-smooth group ${
                         isSelected 
                           ? 'bg-brand-accent/15 text-brand-accent font-semibold' 
                           : 'text-slate-300 hover:bg-brand-hover'
                       }`}
                     >
-                      <div className="flex items-center gap-2 truncate">
+                      <button
+                        onClick={() => handleSelectProfile(p.username)}
+                        className="flex items-center gap-2 truncate flex-1 text-left"
+                      >
                         {p.avatar ? (
                           <img src={p.avatar} alt="" className="w-5 h-5 rounded-full object-cover flex-shrink-0 border border-brand-border" />
                         ) : (
@@ -116,17 +120,34 @@ export default function BrandHeader({
                           </div>
                         )}
                         <span className="truncate">{p.displayName || p.username}</span>
+                      </button>
+
+                      <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {p.totalGames || 0}g
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`Delete account "${p.displayName || p.username}" and all its imported games?`)) {
+                              dispatch(removeProfileAsync(p.username));
+                            }
+                          }}
+                          className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-all"
+                          title="Delete Account"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
-                      <span className="text-[10px] text-slate-400 flex-shrink-0 ml-2 font-mono">
-                        {p.totalGames || 0} games
-                      </span>
-                    </button>
+                    </div>
                   );
                 })}
 
                 {profiles.length === 0 && (
-                  <div className="px-3 py-4 text-center text-xs text-slate-400">
-                    No account imported yet.
+                  <div className="px-3 py-4 text-center text-xs text-slate-400 flex flex-col items-center gap-1">
+                    <UserPlus className="w-5 h-5 text-slate-400 mb-1" />
+                    <span>No account connected yet.</span>
+                    <span className="text-[10px]">Import your Chess.com games below.</span>
                   </div>
                 )}
               </div>

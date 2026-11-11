@@ -14,7 +14,7 @@ import SettingsModal from './components/common/SettingsModal';
 import FenPgnModal from './components/common/FenPgnModal';
 import BishopLogo from './components/brand/BishopLogo';
 
-import { loadProfilesAsync, setSelectedProfile } from './store/slices/opponentSlice';
+import { loadProfilesAsync, setSelectedProfile, removeProfileAsync } from './store/slices/opponentSlice';
 import { loadSampleDatasetAsync, openImportModal } from './store/slices/importSlice';
 import { fetchPositionStatsAsync } from './store/slices/explorerSlice';
 import { updateEvaluation } from './store/slices/engineSlice';
@@ -37,7 +37,9 @@ import {
   BookOpen,
   ChevronRight,
   Shield,
-  HelpCircle
+  HelpCircle,
+  Trash2,
+  UserPlus
 } from 'lucide-react';
 
 export default function App() {
@@ -79,15 +81,9 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, [activeView]);
 
-  // Initial load: Fetch profiles or seed sample dataset
+  // Initial load: Fetch imported profiles
   useEffect(() => {
-    dispatch(loadProfilesAsync()).then((res) => {
-      const loadedProfiles = res.payload || [];
-      if (loadedProfiles.length === 0) {
-        // Automatically seed curated Hikaru Nakamura sample dataset
-        dispatch(loadSampleDatasetAsync('hikaru'));
-      }
-    });
+    dispatch(loadProfilesAsync());
   }, [dispatch]);
 
   // Whenever board position changes or profile changes, fetch Opening Explorer statistics
@@ -158,7 +154,7 @@ export default function App() {
   }, [history.length, settingsOpen, fenPgnOpen, dispatch]);
 
   return (
-    <div className="min-h-screen bg-brand-bg text-slate-100 flex flex-col overflow-x-hidden">
+    <div className="min-h-screen bg-brand-bg flex flex-col overflow-x-hidden">
       
       {/* Brand Header */}
       <BrandHeader 
@@ -182,57 +178,102 @@ export default function App() {
               <div className="p-3.5 bg-brand-surface border border-brand-border rounded-xl flex flex-col gap-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">My Repertoire</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand-accent/15 text-brand-accent font-bold">
-                    Personalized
-                  </span>
+                  {selectedProfile && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand-accent/15 text-brand-accent font-bold">
+                      Active
+                    </span>
+                  )}
                 </div>
 
-                <div className="flex items-center gap-2.5 p-2 rounded-lg bg-brand-card border border-brand-border/60">
-                  <div className="w-8 h-8 rounded-full bg-brand-surface border border-brand-border flex items-center justify-center font-bold text-xs text-brand-accent">
-                    {selectedProfile.charAt(0).toUpperCase()}
+                {selectedProfile ? (
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-brand-card border border-brand-border/60">
+                    <div className="flex items-center gap-2 truncate">
+                      <div className="w-8 h-8 rounded-full bg-brand-surface border border-brand-border flex items-center justify-center font-bold text-xs text-brand-accent flex-shrink-0">
+                        {selectedProfile.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex flex-col truncate">
+                        <strong className="text-xs text-slate-100 truncate">{selectedProfile}</strong>
+                        <span className="text-[10px] text-slate-400">Current Player</span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`Delete account "${selectedProfile}" and all its imported games?`)) {
+                          dispatch(removeProfileAsync(selectedProfile));
+                        }
+                      }}
+                      className="p-1.5 rounded-lg hover:bg-rose-500/15 text-slate-400 hover:text-rose-400 transition-colors"
+                      title="Delete this account"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                  <div className="flex flex-col truncate">
-                    <strong className="text-xs text-slate-100 truncate">{selectedProfile}</strong>
-                    <span className="text-[10px] text-slate-400">Primary Account</span>
+                ) : (
+                  <div className="p-3 text-center rounded-lg bg-brand-card border border-dashed border-brand-border/80 flex flex-col items-center gap-1.5">
+                    <UserPlus className="w-6 h-6 text-slate-400 mb-0.5" />
+                    <span className="text-xs font-semibold text-slate-200">No Account Connected</span>
+                    <span className="text-[10px] text-slate-400 leading-tight">
+                      Import your Chess.com games to explore your personal openings.
+                    </span>
                   </div>
-                </div>
+                )}
 
                 <button
                   onClick={() => dispatch(openImportModal())}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-brand-card hover:bg-brand-hover border border-brand-border text-xs font-semibold text-slate-200 transition-smooth"
+                  className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-brand-accent hover:bg-brand-accentHover text-slate-950 text-xs font-bold transition-smooth shadow-xs"
                 >
-                  <DownloadCloud className="w-3.5 h-3.5 text-brand-accent" />
+                  <DownloadCloud className="w-3.5 h-3.5" />
                   <span>Import My Games</span>
                 </button>
               </div>
 
-              {/* Quick Profile Switcher */}
-              <div className="p-3 bg-brand-surface border border-brand-border rounded-xl flex flex-col gap-2 flex-1 max-h-[380px] overflow-y-auto">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  Switch Account
-                </span>
-                <div className="flex flex-col gap-1">
-                  {profiles.map((p) => {
-                    const isSelected = p.username === selectedProfile;
-                    return (
-                      <button
-                        key={p.username}
-                        onClick={() => dispatch(setSelectedProfile(p.username))}
-                        className={`w-full px-2.5 py-2 rounded-lg text-left text-xs flex items-center justify-between transition-smooth ${
-                          isSelected
-                            ? 'bg-brand-accent/20 border border-brand-accent text-brand-accent font-bold'
-                            : 'hover:bg-brand-hover text-slate-300'
-                        }`}
-                      >
-                        <span className="truncate">{p.displayName || p.username}</span>
-                        <span className="text-[10px] text-slate-400 font-mono ml-1">
-                          {p.totalGames || 0}g
-                        </span>
-                      </button>
-                    );
-                  })}
+              {/* Accounts List & Switcher */}
+              {profiles.length > 0 && (
+                <div className="p-3 bg-brand-surface border border-brand-border rounded-xl flex flex-col gap-2 flex-1 max-h-[360px] overflow-y-auto">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    <span>Accounts ({profiles.length})</span>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    {profiles.map((p) => {
+                      const isSelected = p.username === selectedProfile;
+                      return (
+                        <div
+                          key={p.username}
+                          onClick={() => dispatch(setSelectedProfile(p.username))}
+                          className={`w-full px-2.5 py-2 rounded-lg text-left text-xs flex items-center justify-between transition-smooth cursor-pointer group ${
+                            isSelected
+                              ? 'bg-brand-accent/20 border border-brand-accent text-brand-accent font-bold'
+                              : 'hover:bg-brand-hover text-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 truncate mr-1">
+                            <span className="truncate">{p.displayName || p.username}</span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {p.totalGames || 0}g
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm(`Delete account "${p.displayName || p.username}" and all its imported games?`)) {
+                                  dispatch(removeProfileAsync(p.username));
+                                }
+                              }}
+                              className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-all"
+                              title="Delete Account"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Lab Philosophy Badge */}
               <div className="p-3 bg-brand-surface/60 border border-brand-border/60 rounded-xl text-[11px] text-slate-400 leading-relaxed">
